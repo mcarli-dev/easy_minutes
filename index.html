@@ -1,0 +1,1911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local Meeting Minutes</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="storage.js"></script>
+  <script>
+    window._STORAGE_OK = (typeof Storage !== 'undefined' && typeof Storage.init === 'function');
+  </script>
+  <style>
+    /* ===== RESET + BASE ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --primary-light: #dbeafe;
+      --success: #16a34a;
+      --success-light: #dcfce7;
+      --warning: #d97706;
+      --warning-light: #fef3c7;
+      --danger: #dc2626;
+      --danger-light: #fee2e2;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+      --radius: 8px;
+      --radius-lg: 12px;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--gray-100);
+      color: var(--gray-800);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ===== HEADER ===== */
+    .app-header {
+      position: sticky; top: 0; z-index: 100;
+      background: #fff;
+      border-bottom: 1px solid var(--gray-200);
+      height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px;
+      box-shadow: var(--shadow-sm);
+    }
+    .logo {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 18px; font-weight: 700; color: var(--gray-900); white-space: nowrap;
+      min-width: 160px;
+    }
+    .logo-icon { font-size: 22px; }
+    .header-logo-img { height: 36px; width: auto; max-width: 120px; object-fit: contain; border-radius: 4px; }
+    .nav-tabs {
+      display: flex; gap: 4px;
+      background: var(--gray-100); border-radius: var(--radius); padding: 3px;
+    }
+    .nav-tab {
+      padding: 6px 16px; border: none; background: transparent;
+      border-radius: 6px; font-size: 14px; font-weight: 500;
+      color: var(--gray-600); cursor: pointer; transition: all 0.15s ease;
+    }
+    .nav-tab:hover { color: var(--gray-800); background: var(--gray-50); }
+    .nav-tab.active { background: var(--primary-light); color: var(--primary); }
+    .header-actions { display: flex; align-items: center; gap: 8px; min-width: 160px; justify-content: flex-end; }
+    #status-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--gray-300); transition: background 0.3s ease;
+    }
+    .status-dot.saved   { background: var(--success) !important; }
+    .status-dot.unsaved { background: var(--warning) !important; }
+    .status-dot.saving  { background: var(--primary) !important; }
+    #status-text { font-size: 13px; color: var(--gray-500); }
+
+    /* ===== MAIN ===== */
+    .app-main { max-width: 900px; margin: 0 auto; padding: 24px 16px 90px; }
+
+    /* ===== VIEWS ===== */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ===== CARD ===== */
+    .card {
+      background: #fff; border-radius: var(--radius-lg);
+      box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden;
+    }
+    .card-header {
+      padding: 16px 20px; border-bottom: 1px solid var(--gray-100);
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .card-header h2 {
+      font-size: 16px; font-weight: 600; color: var(--gray-800);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card-header-actions { display: flex; align-items: center; gap: 8px; }
+    .card-body { padding: 20px; }
+
+    /* ===== FORMS ===== */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .full-width { grid-column: 1 / -1; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label {
+      font-size: 13px; font-weight: 600; color: var(--gray-600);
+      text-transform: uppercase; letter-spacing: 0.025em;
+    }
+    input[type="text"], input[type="date"], textarea, select {
+      width: 100%; padding: 10px 12px;
+      border: 1px solid var(--gray-300); border-radius: var(--radius);
+      font-size: 14px; font-family: inherit; color: var(--gray-800); background: #fff;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    input[type="text"]:focus, input[type="date"]:focus, textarea:focus, select:focus {
+      outline: none; border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+    }
+    textarea { resize: vertical; min-height: 80px; }
+
+    /* ===== BUTTONS ===== */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 16px; border: 1px solid transparent; border-radius: var(--radius);
+      font-size: 14px; font-weight: 500; font-family: inherit;
+      cursor: pointer; transition: all 0.15s ease; white-space: nowrap;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary  { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled)   { background: var(--primary-dark); }
+    .btn-secondary { background: var(--gray-100); color: var(--gray-700); border-color: var(--gray-300); }
+    .btn-secondary:hover:not(:disabled) { background: var(--gray-200); }
+    .btn-success  { background: var(--success); color: #fff; }
+    .btn-success:hover:not(:disabled)   { background: #15803d; }
+    .btn-danger   { background: var(--danger); color: #fff; }
+    .btn-danger:hover:not(:disabled)    { background: #b91c1c; }
+    .btn-outline  { background: #fff; color: var(--gray-700); border-color: var(--gray-300); }
+    .btn-outline:hover:not(:disabled)   { background: var(--gray-50); border-color: var(--gray-400); }
+    .btn-sm  { padding: 5px 10px; font-size: 13px; }
+    .btn-icon { padding: 6px; min-width: 32px; min-height: 32px; }
+
+    /* ===== ATTENDEES CHECKLIST ===== */
+    .attendees-checklist {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 8px;
+    }
+    .attendee-check-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 12px; border: 1px solid var(--gray-200);
+      border-radius: var(--radius); cursor: pointer;
+      transition: all 0.15s ease; user-select: none;
+    }
+    .attendee-check-item:hover { border-color: var(--primary); }
+    .attendee-check-item.selected { border-color: var(--primary); background: var(--primary-light); }
+    .attendee-check-item input[type="checkbox"] { margin-top: 2px; cursor: pointer; flex-shrink: 0; }
+    .attendee-check-label { display: flex; flex-direction: column; gap: 1px; }
+    .attendee-check-name { font-size: 14px; font-weight: 500; color: var(--gray-800); }
+    .attendee-check-company { font-size: 12px; color: var(--gray-500); }
+    .attendees-empty-hint {
+      font-size: 13px; color: var(--gray-400); padding: 12px 0;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    /* ===== AGENDA POINT ITEMS ===== */
+    .agenda-point-item {
+      border: 1px solid var(--gray-200); border-radius: var(--radius);
+      padding: 14px 16px; margin-bottom: 10px;
+      transition: box-shadow 0.15s ease, border-color 0.15s ease;
+      background: #fff;
+    }
+    .agenda-point-item:hover { box-shadow: var(--shadow-md); border-color: var(--gray-300); }
+    .agenda-point-item.status-resolved { opacity: 0.65; }
+    .agenda-point-item.status-blocked { border-left: 4px solid var(--danger); }
+    .agenda-point-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
+    .agenda-point-title { font-size: 15px; font-weight: 600; color: var(--gray-900); flex: 1; line-height: 1.4; }
+    .agenda-point-title.resolved-title { text-decoration: line-through; color: var(--gray-400); }
+    .agenda-point-description { font-size: 13px; color: var(--gray-600); margin-bottom: 10px; line-height: 1.6; }
+    .agenda-point-meta {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .agenda-meta-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 12px; color: var(--gray-500);
+    }
+    .agenda-point-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    .item-action-btn {
+      width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+      border: none; background: transparent; border-radius: 6px;
+      cursor: pointer; color: var(--gray-400); font-size: 14px; transition: all 0.15s ease;
+    }
+    .item-action-btn:hover { background: var(--gray-100); color: var(--gray-700); }
+    .item-action-btn.delete:hover { background: var(--danger-light); color: var(--danger); }
+
+    /* ===== DEADLINE COUNTDOWN ===== */
+    .deadline-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 600; padding: 2px 7px;
+      border-radius: 12px;
+    }
+    .deadline-badge.on-time { background: var(--success-light); color: var(--success); }
+    .deadline-badge.soon    { background: var(--warning-light); color: var(--warning); }
+    .deadline-badge.overdue { background: var(--danger-light); color: var(--danger); }
+    .deadline-badge.no-deadline { background: var(--gray-100); color: var(--gray-400); }
+
+    /* ===== BADGES ===== */
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 2px 8px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    }
+    .badge-open        { background: var(--primary-light); color: var(--primary); }
+    .badge-resolved    { background: var(--success-light); color: var(--success); }
+    .badge-blocked     { background: var(--danger-light); color: var(--danger); }
+    .badge-carried     { background: var(--warning-light); color: var(--warning); }
+
+    /* ===== INLINE STATUS SELECT ===== */
+    .status-select-inline {
+      padding: 3px 6px; border: 1px solid var(--gray-200); border-radius: 20px;
+      font-size: 12px; font-weight: 600; font-family: inherit;
+      cursor: pointer; background: var(--gray-50); color: var(--gray-700);
+      transition: border-color 0.15s ease;
+    }
+    .status-select-inline:focus { outline: none; border-color: var(--primary); }
+    .status-select-inline.open     { background: var(--primary-light); color: var(--primary); border-color: var(--primary-light); }
+    .status-select-inline.resolved { background: var(--success-light); color: var(--success); border-color: var(--success-light); }
+    .status-select-inline.blocked  { background: var(--danger-light);  color: var(--danger);  border-color: var(--danger-light); }
+
+    /* ===== MASTER ATTENDEES TABLE ===== */
+    .attendees-table { width: 100%; border-collapse: collapse; }
+    .attendees-table th {
+      text-align: left; padding: 8px 12px;
+      font-size: 12px; font-weight: 600; color: var(--gray-500);
+      text-transform: uppercase; letter-spacing: 0.025em;
+      border-bottom: 2px solid var(--gray-200);
+    }
+    .attendees-table td {
+      padding: 10px 12px; font-size: 14px;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .attendees-table tr:last-child td { border-bottom: none; }
+    .attendees-table tr:hover td { background: var(--gray-50); }
+    .attendees-table .actions-cell { display: flex; gap: 4px; }
+
+    /* ===== SETTINGS ===== */
+    .settings-option {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--gray-100);
+    }
+    .settings-option:last-child { border-bottom: none; }
+    .settings-option input[type="radio"] { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+    .settings-option label { font-size: 14px; color: var(--gray-700); cursor: pointer; }
+    .settings-option .option-desc { font-size: 12px; color: var(--gray-400); margin-left: 26px; }
+    .logo-upload-area { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+    .logo-current { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+    .logo-preview-box {
+      width: 160px; height: 80px; border: 2px dashed var(--gray-200);
+      border-radius: var(--radius); display: flex; align-items: center; justify-content: center;
+      background: var(--gray-50); overflow: hidden;
+    }
+    .logo-preview-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .logo-preview-box .logo-placeholder { font-size: 13px; color: var(--gray-400); text-align: center; padding: 8px; }
+    .file-hint { font-size: 12px; color: var(--gray-400); margin-top: 4px; }
+
+    /* ===== ADD ITEM FIELDS ===== */
+    .add-item-fields {
+      display: none; flex-direction: column; gap: 10px;
+      padding: 16px 20px; border-top: 1px solid var(--gray-100); background: var(--gray-50);
+    }
+    .add-item-fields.visible { display: flex; }
+    .add-item-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state {
+      display: none; text-align: center;
+      padding: 32px 16px; color: var(--gray-400); font-size: 14px;
+    }
+    .empty-state-icon { font-size: 32px; margin-bottom: 8px; }
+
+    /* ===== FOOTER ===== */
+    .footer-actions {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 90;
+      background: #fff; border-top: 1px solid var(--gray-200);
+      padding: 12px 24px; display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 -4px 6px -1px rgba(0,0,0,0.07);
+    }
+    .spacer { flex: 1; }
+
+    /* ===== HISTORY ===== */
+    .history-entry {
+      display: flex; gap: 16px; padding: 16px 0; position: relative;
+    }
+    .history-entry:not(:last-child)::before {
+      content: ''; position: absolute;
+      left: 15px; top: 46px; bottom: -2px; width: 2px; background: var(--gray-200);
+    }
+    .history-dot {
+      width: 32px; height: 32px; min-width: 32px; border-radius: 50%;
+      background: var(--primary-light); display: flex; align-items: center;
+      justify-content: center; font-size: 14px; z-index: 1;
+    }
+    .history-content { flex: 1; min-width: 0; }
+    .history-title { font-size: 15px; font-weight: 600; color: var(--gray-800); margin-bottom: 4px; }
+    .history-meta { font-size: 13px; color: var(--gray-500); margin-bottom: 8px; }
+    .history-changes { margin: 6px 0 10px; display: flex; flex-direction: column; gap: 3px; }
+    .change-item { font-size: 13px; color: var(--gray-600); display: flex; align-items: baseline; gap: 6px; }
+    .history-btns { display: flex; gap: 6px; margin-top: 8px; }
+
+    /* ===== MODAL ===== */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.5); display: none;
+      align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal {
+      background: #fff; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+      max-width: 520px; width: 100%; max-height: 88vh;
+      display: flex; flex-direction: column;
+    }
+    .modal-wide { max-width: 620px; }
+    .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--gray-100); font-size: 16px; font-weight: 600; }
+    .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+    .modal-footer { padding: 12px 20px; border-top: 1px solid var(--gray-100); display: flex; justify-content: flex-end; gap: 8px; }
+    .modal-body .form-group { margin-bottom: 14px; }
+    .modal-body .form-group:last-child { margin-bottom: 0; }
+    #finalize-summary { font-size: 14px; line-height: 1.7; }
+    #finalize-summary p { margin-bottom: 6px; }
+
+    /* ===== TOAST ===== */
+    .toast-container { position: fixed; bottom: 80px; right: 24px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
+    .toast {
+      background: var(--gray-800); color: #fff;
+      padding: 12px 20px; border-radius: var(--radius);
+      font-size: 14px; box-shadow: var(--shadow-lg);
+      animation: toast-in 0.3s ease forwards;
+      max-width: 360px; transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .toast.success { background: var(--success); }
+    .toast.error   { background: var(--danger); }
+    .toast.warning { background: var(--warning); }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateX(40px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    /* ===== LOADING ===== */
+    .loading-overlay {
+      position: fixed; inset: 0; z-index: 250;
+      background: rgba(255,255,255,0.8); display: none;
+      align-items: center; justify-content: center; flex-direction: column; gap: 16px;
+    }
+    .loading-overlay.visible { display: flex; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--gray-200); border-top-color: var(--primary);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-overlay span { font-size: 14px; color: var(--gray-600); font-weight: 500; }
+
+    /* ===== PDF PREVIEW ===== */
+    #pdf-preview {
+      position: fixed; inset: 0; z-index: 150;
+      background: #fff; display: none; flex-direction: column;
+    }
+    #pdf-preview.visible { display: flex; }
+    .pdf-preview-controls {
+      position: sticky; top: 0;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      padding: 12px 24px; background: var(--gray-50);
+      border-bottom: 1px solid var(--gray-200); z-index: 2;
+    }
+    .pdf-preview-title { font-size: 14px; font-weight: 600; color: var(--gray-700); }
+    .pdf-content { flex: 1; overflow-y: auto; padding: 40px; max-width: 800px; margin: 0 auto; width: 100%; }
+
+    /* ===== PRINT ===== */
+    @media print {
+      body * { visibility: hidden; }
+      #pdf-preview, #pdf-preview * { visibility: visible; }
+      #pdf-preview { position: absolute; inset: 0; }
+      .pdf-preview-controls { display: none !important; }
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .full-width { grid-column: auto; }
+      .app-header { padding: 0 12px; }
+      .card-body { padding: 14px; }
+      .card-header { padding: 12px 14px; }
+      .footer-actions { padding: 10px 12px; gap: 6px; flex-wrap: wrap; }
+      .footer-actions .btn { font-size: 12px; padding: 6px 10px; }
+      .app-main { padding: 16px 8px 100px; }
+      .logo span:not(.logo-icon) { display: none; }
+      .pdf-content { padding: 20px; }
+      .attendees-checklist { grid-template-columns: 1fr 1fr; }
+      .nav-tab { padding: 6px 10px; font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="app-header">
+    <div class="logo">
+      <img id="header-logo-img" class="header-logo-img" style="display:none;" alt="Logo">
+      <span class="logo-icon" id="header-logo-icon">&#x1F4CB;</span>
+      <span>Meeting Minutes</span>
+    </div>
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-view="editor">Editor</button>
+      <button class="nav-tab" data-view="history">History</button>
+      <button class="nav-tab" data-view="settings">Settings</button>
+    </nav>
+    <div class="header-actions">
+      <div id="status-dot"></div>
+      <span id="status-text">Ready</span>
+    </div>
+  </header>
+
+  <!-- ===== MAIN ===== -->
+  <main class="app-main">
+
+    <!-- ===== EDITOR VIEW ===== -->
+    <div id="view-editor" class="view active">
+
+      <!-- Meeting Details -->
+      <div class="card">
+        <div class="card-header">
+          <h2>&#x1F4DD; Meeting Details</h2>
+        </div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="meeting-title">Meeting Title</label>
+              <input type="text" id="meeting-title" placeholder="e.g., Weekly Team Standup">
+            </div>
+            <div class="form-group">
+              <label for="meeting-date">Date</label>
+              <input type="date" id="meeting-date">
+            </div>
+            <div class="form-group full-width">
+              <label>Attendees</label>
+              <div id="attendees-checklist" class="attendees-checklist"></div>
+              <div id="attendees-checklist-empty" class="attendees-empty-hint" style="display:none;">
+                &#x2139;&#xFE0F; No attendees in master list.
+                <button class="btn btn-sm btn-outline" onclick="App.switchView('settings')" style="margin-left:6px;">Go to Settings</button>
+              </div>
+            </div>
+            <div class="form-group full-width">
+              <label for="meeting-notes">Notes</label>
+              <textarea id="meeting-notes" rows="4" placeholder="General meeting notes..."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agenda Points (renamed from Action Items, new structure) -->
+      <div class="card">
+        <div class="card-header">
+          <h2>&#x1F3AF; Agenda Points <span id="agenda-count" class="badge badge-open" style="margin-left:6px;">0</span></h2>
+          <div class="card-header-actions">
+            <button class="btn btn-sm btn-primary" onclick="App.openAddAgenda()">+ Add Point</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding-top:12px;">
+          <div id="agenda-list"></div>
+          <div id="agenda-empty" class="empty-state">
+            <div class="empty-state-icon">&#x1F3AF;</div>
+            <div>No agenda points yet. Add one to get started.</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /view-editor -->
+
+    <!-- ===== HISTORY VIEW ===== -->
+    <div id="view-history" class="view">
+      <div class="card">
+        <div class="card-header">
+          <h2>&#x1F4DA; Meeting History <span id="history-count" class="badge badge-open" style="margin-left:6px;">0</span></h2>
+        </div>
+        <div class="card-body">
+          <div id="history-list"></div>
+          <div id="history-empty" class="empty-state">
+            <div class="empty-state-icon">&#x1F4DA;</div>
+            <div>No meeting history yet. Finalize a meeting to see it here.</div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /view-history -->
+
+    <!-- ===== SETTINGS VIEW ===== -->
+    <div id="view-settings" class="view">
+
+      <!-- Logo Upload -->
+      <div class="card">
+        <div class="card-header">
+          <h2>&#x1F5BC;&#xFE0F; Company Logo</h2>
+        </div>
+        <div class="card-body">
+          <div class="logo-upload-area">
+            <div class="logo-current">
+              <div class="logo-preview-box" id="settings-logo-box">
+                <span class="logo-placeholder" id="settings-logo-placeholder">No logo</span>
+                <img id="settings-logo-img" style="display:none;" alt="Logo">
+              </div>
+              <button class="btn btn-sm btn-danger" id="remove-logo-btn" style="display:none;" onclick="App.removeLogo()">&#x2716; Remove</button>
+            </div>
+            <div>
+              <div class="form-group">
+                <label>Upload Logo (JPEG / PNG)</label>
+                <input type="file" id="logo-upload" accept=".jpg,.jpeg,.png" style="padding:6px;">
+              </div>
+              <p class="file-hint">Logo will appear top-left in the app and in exported PDFs.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Date Display Mode -->
+      <div class="card">
+        <div class="card-header">
+          <h2>&#x1F4C5; Deadline Display Mode</h2>
+        </div>
+        <div class="card-body">
+          <div class="settings-option">
+            <input type="radio" name="dateMode" id="dateMode-exact" value="exact">
+            <div>
+              <label for="dateMode-exact">Use exact dates</label>
+              <div class="option-desc">Deadlines shown as: <em>Mar 15, 2025 &bull; 3 days left</em></div>
+            </div>
+          </div>
+          <div class="settings-option">
+            <input type="radio" name="dateMode" id="dateMode-cw" value="cw">
+            <div>
+              <label for="dateMode-cw">Use calendar weeks (CW)</label>
+              <div class="option-desc">Deadlines shown as: <em>CW 11/2025 &bull; 1 week left</em></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Attendees Master List -->
+      <div class="card">
+        <div class="card-header">
+          <h2>&#x1F465; Attendees Master List</h2>
+          <div class="card-header-actions">
+            <button class="btn btn-sm btn-primary" onclick="App.openAddAttendee()">+ Add Person</button>
+          </div>
+        </div>
+        <div class="card-body" id="settings-attendees-body">
+          <div id="attendees-master-empty" class="empty-state" style="display:block;">
+            <div class="empty-state-icon">&#x1F465;</div>
+            <div>No attendees yet. Add people who regularly attend meetings.</div>
+          </div>
+          <table class="attendees-table" id="attendees-master-table" style="display:none;">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Surname</th>
+                <th>Company</th>
+                <th style="width:80px;"></th>
+              </tr>
+            </thead>
+            <tbody id="attendees-master-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /view-settings -->
+
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <div class="footer-actions">
+    <button class="btn btn-outline btn-sm" onclick="App.switchView('settings')">&#x2699;&#xFE0F; Settings</button>
+    <button class="btn btn-outline btn-sm" onclick="App.openLoadPrevious()">&#x1F4C2; Load Previous</button>
+    <div class="spacer"></div>
+    <button class="btn btn-outline btn-sm" onclick="App.previewPDF()">&#x1F441; Preview</button>
+    <button class="btn btn-success btn-sm" onclick="App.finalizeMeeting()">&#x1F3C1; Finalize</button>
+  </div>
+
+  <!-- ===== FINALIZE MODAL ===== -->
+  <div id="finalize-modal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">&#x1F3C1; Finalize Meeting</div>
+      <div class="modal-body"><div id="finalize-summary"></div></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="App.closeModal('finalize-modal')">Cancel</button>
+        <button class="btn btn-success" onclick="App.confirmFinalize()">Confirm &amp; Finalize</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== AGENDA POINT MODAL (Add / Edit) ===== -->
+  <div id="agenda-modal" class="modal-overlay">
+    <div class="modal modal-wide">
+      <div class="modal-header" id="agenda-modal-title">&#x1F3AF; Add Agenda Point</div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Title <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="agenda-title-input" placeholder="Agenda point title...">
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="agenda-description-input" rows="3" placeholder="Detailed description (optional)..."></textarea>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Assignee</label>
+            <select id="agenda-assignee-input">
+              <option value="">— No assignee —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Deadline</label>
+            <input type="date" id="agenda-deadline-input">
+          </div>
+          <div class="form-group full-width">
+            <label>Status</label>
+            <select id="agenda-status-input">
+              <option value="open">Open</option>
+              <option value="resolved">Resolved</option>
+              <option value="blocked">Blocked</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="App.closeModal('agenda-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="App.saveAgendaPoint()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ATTENDEE MODAL (Add / Edit) ===== -->
+  <div id="attendee-modal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header" id="attendee-modal-title">&#x1F464; Add Attendee</div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Name <span style="color:var(--danger)">*</span></label>
+            <input type="text" id="attendee-name-input" placeholder="First name">
+          </div>
+          <div class="form-group">
+            <label>Surname <span style="color:var(--danger)">*</span></label>
+            <input type="text" id="attendee-surname-input" placeholder="Last name">
+          </div>
+          <div class="form-group full-width">
+            <label>Company</label>
+            <input type="text" id="attendee-company-input" placeholder="Company (optional)">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="App.closeModal('attendee-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="App.saveAttendee()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== LOAD PREVIOUS MODAL ===== -->
+  <div id="load-previous-modal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">&#x1F4C2; Load Previous Meeting</div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Select a previous meeting</label>
+          <select id="load-previous-select" style="margin-top:4px;"></select>
+        </div>
+        <p style="font-size:13px;color:var(--gray-500);margin-top:12px;line-height:1.6;">
+          Open and blocked agenda points will be carried over into a new draft.
+          Title and attendees will be pre-filled from the selected meeting.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="App.closeModal('load-previous-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="App.confirmLoadPrevious()">Create Draft</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PDF PREVIEW ===== -->
+  <div id="pdf-preview">
+    <div class="pdf-preview-controls">
+      <span class="pdf-preview-title" id="pdf-preview-label">Preview</span>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary btn-sm" id="pdf-download-btn" onclick="App.exportPDFFromPreview()">&#x1F4E5; Download PDF</button>
+        <button class="btn btn-secondary btn-sm" onclick="App.closePDFPreview()">&#x2715; Close</button>
+      </div>
+    </div>
+    <div id="pdf-content" class="pdf-content"></div>
+  </div>
+
+  <!-- ===== TOAST + LOADING ===== -->
+  <div id="toast-container" class="toast-container"></div>
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="spinner"></div>
+    <span>Processing&#x2026;</span>
+  </div>
+
+  <script>
+  /* ======================================================================
+     UTILS — Pure helper functions
+     ====================================================================== */
+  const Utils = {
+    uuid() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+      });
+    },
+
+    _parseDate(dateStr) {
+      if (!dateStr) return null;
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    },
+
+    formatDate(dateStr) {
+      const d = this._parseDate(dateStr);
+      if (!d) return '';
+      return d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    },
+
+    formatDateShort(dateStr) {
+      const d = this._parseDate(dateStr);
+      if (!d) return '';
+      return d.toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' });
+    },
+
+    today() {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    },
+
+    formatTimestamp(ts) {
+      return new Date(ts).toLocaleDateString('en-US', {
+        year:'numeric', month:'short', day:'numeric',
+        hour:'numeric', minute:'2-digit', hour12: true
+      });
+    },
+
+    // ISO 8601 calendar week
+    getISOWeek(dateStr) {
+      const d = this._parseDate(dateStr);
+      if (!d) return null;
+      const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      const day = date.getUTCDay() || 7; // Mon=1 … Sun=7
+      date.setUTCDate(date.getUTCDate() + 4 - day);
+      const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+      const week = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+      return { week, year: date.getUTCFullYear() };
+    },
+
+    // Returns formatted deadline label according to dateMode
+    formatDeadline(dateStr, dateMode) {
+      if (!dateStr) return '';
+      if (dateMode === 'cw') {
+        const cw = this.getISOWeek(dateStr);
+        if (!cw) return '';
+        return `CW ${String(cw.week).padStart(2,'0')}/${cw.year}`;
+      }
+      return this.formatDateShort(dateStr);
+    },
+
+    // Returns { label, countdown, isOverdue, cssClass }
+    getDeadlineInfo(dateStr, dateMode) {
+      if (!dateStr) return null;
+      const today = new Date(); today.setHours(0,0,0,0);
+      const [y,m,d] = dateStr.split('-').map(Number);
+      const deadline = new Date(y, m-1, d);
+      const diffMs   = deadline - today;
+      const diffDays = Math.round(diffMs / 86400000);
+      const diffWeeks = Math.ceil(diffMs / (86400000 * 7));
+      const isOverdue = diffDays < 0;
+
+      let countdown;
+      if (dateMode === 'cw') {
+        const abW = Math.abs(diffWeeks);
+        if (isOverdue)      countdown = `${abW} week${abW !== 1 ? 's' : ''} overdue`;
+        else if (diffWeeks === 0) countdown = 'due this week';
+        else                countdown = `${diffWeeks} week${diffWeeks !== 1 ? 's' : ''} left`;
+      } else {
+        const abD = Math.abs(diffDays);
+        if (isOverdue)      countdown = `${abD} day${abD !== 1 ? 's' : ''} overdue`;
+        else if (diffDays === 0) countdown = 'due today';
+        else                countdown = `${diffDays} day${diffDays !== 1 ? 's' : ''} left`;
+      }
+
+      let cssClass = 'on-time';
+      if (isOverdue) cssClass = 'overdue';
+      else if ((!dateMode || dateMode === 'exact') && diffDays <= 3) cssClass = 'soon';
+      else if (dateMode === 'cw' && diffWeeks <= 1) cssClass = 'soon';
+
+      return { label: this.formatDeadline(dateStr, dateMode), countdown, isOverdue, cssClass };
+    },
+
+    // Format attendee for display
+    formatAttendee(a) {
+      if (!a) return 'Unknown';
+      const full = `${a.name} ${a.surname}`.trim();
+      return a.company ? `${full} (${a.company})` : full;
+    },
+
+    getAttendeeById(id, list) {
+      return (list || []).find(a => a.id === id) || null;
+    },
+
+    clone(obj)      { return JSON.parse(JSON.stringify(obj)); },
+
+    escapeHtml(str) {
+      if (str == null) return '';
+      const el = document.createElement('span');
+      el.textContent = str;
+      return el.innerHTML;
+    }
+  };
+
+  /* ======================================================================
+     STATE — In-memory app state and mutations
+     ====================================================================== */
+  const State = {
+    current: null,
+    isDirty: false,
+    meetings: [],
+    masterAttendees: [],
+    settings: { dateMode: 'exact', logoDataUrl: null },
+    editingAgendaId: null,
+    editingAttendeeId: null,
+    previewMeetingId: null, // which meeting is open in PDF preview
+
+    createNewMeeting(prev = null) {
+      const m = {
+        id: Utils.uuid(),
+        title: '',
+        date: Utils.today(),
+        attendeeIds: [],
+        notes: '',
+        agendaPoints: [],
+        createdAt: Date.now(),
+        finalizedAt: null,
+        previousMeetingId: null
+      };
+      if (prev) {
+        m.title            = prev.title || '';
+        m.attendeeIds      = [...(prev.attendeeIds || [])];
+        m.previousMeetingId = prev.id;
+        // Carry over open / blocked agenda points
+        (prev.agendaPoints || []).forEach(ap => {
+          if (ap.status === 'open' || ap.status === 'blocked') {
+            m.agendaPoints.push({
+              id: Utils.uuid(),
+              title: ap.title || ap.text || '',
+              description: ap.description || ap.notes || '',
+              assigneeId: ap.assigneeId || '',
+              deadline: ap.deadline || ap.dueDate || '',
+              status: 'open',
+              createdAt: Date.now(),
+              carriedOverFrom: prev.id
+            });
+          }
+        });
+      }
+      return m;
+    },
+
+    addAgendaPoint(title, description, assigneeId, deadline, status) {
+      if (!this.current) return;
+      this.current.agendaPoints.push({
+        id: Utils.uuid(),
+        title: title.trim(),
+        description: (description || '').trim(),
+        assigneeId: assigneeId || '',
+        deadline: deadline || '',
+        status: status || 'open',
+        createdAt: Date.now(),
+        carriedOverFrom: null
+      });
+      this.isDirty = true;
+    },
+
+    updateAgendaPoint(id, changes) {
+      if (!this.current) return;
+      const ap = this.current.agendaPoints.find(p => p.id === id);
+      if (ap) { Object.assign(ap, changes); this.isDirty = true; }
+    },
+
+    removeAgendaPoint(id) {
+      if (!this.current) return;
+      this.current.agendaPoints = this.current.agendaPoints.filter(p => p.id !== id);
+      this.isDirty = true;
+    },
+
+    toggleAttendee(attendeeId) {
+      if (!this.current) return;
+      const idx = this.current.attendeeIds.indexOf(attendeeId);
+      if (idx === -1) this.current.attendeeIds.push(attendeeId);
+      else            this.current.attendeeIds.splice(idx, 1);
+      this.isDirty = true;
+    },
+
+    syncFromForm() {
+      if (!this.current) return;
+      const v = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+      this.current.title = v('meeting-title');
+      this.current.date  = v('meeting-date');
+      this.current.notes = v('meeting-notes');
+    },
+
+    computeChanges(prev, curr) {
+      const changes = [];
+      if (!curr) return changes;
+      const prevAP   = new Map((prev ? prev.agendaPoints || [] : []).map(p => [p.id, p]));
+      const currAPIds = new Set((curr.agendaPoints || []).map(p => p.id));
+
+      (curr.agendaPoints || []).forEach(p => {
+        const old   = prevAP.get(p.id);
+        const title = p.title || p.text || 'Untitled';
+        if (!old) {
+          if (!p.carriedOverFrom) changes.push({ type:'added', text: title });
+        } else {
+          if (old.status !== 'resolved' && p.status === 'resolved')
+            changes.push({ type:'resolved', text: title });
+          else if (old.status !== 'blocked' && p.status === 'blocked')
+            changes.push({ type:'blocked', text: title });
+          else if ((old.status === 'resolved' || old.status === 'blocked') && p.status === 'open')
+            changes.push({ type:'reopened', text: title });
+        }
+      });
+      if (prev) (prev.agendaPoints || []).forEach(p => {
+        if (!currAPIds.has(p.id)) changes.push({ type:'removed', text: p.title || p.text || 'Untitled' });
+      });
+      return changes;
+    }
+  };
+
+  /* ======================================================================
+     PDFGEN — Report generation (includes logo, attendees, agenda points)
+     ====================================================================== */
+  const PDFGen = {
+    CSS: `
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:Georgia,'Times New Roman',serif;font-size:13px;line-height:1.6;color:#222}
+      .pdf-wrap{width:740px;padding:48px 48px 40px;background:#fff}
+      .pdf-header{padding-bottom:20px;border-bottom:2px solid #1a1a1a;margin-bottom:28px}
+      .pdf-header-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}
+      .pdf-logo img{max-height:52px;max-width:140px;object-fit:contain}
+      .pdf-org{font-size:10px;text-transform:uppercase;letter-spacing:.15em;color:#777;margin-bottom:6px;font-family:Arial,sans-serif}
+      .pdf-title{font-size:24px;font-weight:bold;color:#111;margin-bottom:4px}
+      .pdf-meta{font-size:12px;color:#555;margin-bottom:3px}
+      .pdf-section{margin-bottom:24px}
+      .pdf-section-title{font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.12em;font-family:Arial,sans-serif;color:#444;border-bottom:1px solid #d0d0d0;padding-bottom:5px;margin-bottom:14px}
+      .pdf-item{margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #f0f0f0}
+      .pdf-item:last-child{border-bottom:none}
+      .pdf-item-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px}
+      .pdf-item-num{color:#999;min-width:22px;font-size:12px;flex-shrink:0;padding-top:2px}
+      .pdf-item-body{flex:1}
+      .pdf-item-title{font-size:14px;font-weight:bold;color:#111;margin-bottom:3px}
+      .pdf-item-desc{font-size:12px;color:#444;margin-bottom:6px;line-height:1.5}
+      .pdf-tag{display:inline-block;font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:3px;font-family:Arial,sans-serif;flex-shrink:0}
+      .pdf-tag-open{background:#dbeafe;color:#1d4ed8}
+      .pdf-tag-resolved{background:#dcfce7;color:#15803d}
+      .pdf-tag-blocked{background:#fee2e2;color:#dc2626}
+      .pdf-item-meta{font-size:11px;color:#888;display:flex;gap:12px;flex-wrap:wrap;margin-top:4px}
+      .pdf-overdue{color:#dc2626;font-weight:600}
+      .pdf-carried{font-size:10px;color:#d97706;margin-top:3px;font-family:Arial,sans-serif}
+      .pdf-attendees{font-size:13px;color:#333;line-height:1.8}
+      .pdf-notes-block{font-size:13px;color:#333;white-space:pre-wrap;line-height:1.7}
+      .pdf-footer{margin-top:48px;padding-top:12px;border-top:1px solid #e0e0e0;font-size:10px;color:#bbb;text-align:center;font-family:Arial,sans-serif}
+    `,
+
+    generateHTML(meeting, masterAttendees, settings) {
+      const esc      = Utils.escapeHtml;
+      const dateMode = (settings && settings.dateMode) || 'exact';
+      const logoUrl  = settings && settings.logoDataUrl;
+
+      // Resolve attendees (new IDs or legacy strings)
+      let attendeeList = [];
+      if (meeting.attendeeIds && meeting.attendeeIds.length > 0) {
+        attendeeList = meeting.attendeeIds
+          .map(id => Utils.getAttendeeById(id, masterAttendees))
+          .filter(Boolean)
+          .map(a => Utils.formatAttendee(a));
+      } else if (meeting.attendees && meeting.attendees.length > 0) {
+        // Backward compat: old string array
+        attendeeList = meeting.attendees;
+      }
+
+      const logoHtml = logoUrl
+        ? `<div class="pdf-logo"><img src="${logoUrl}" alt="Logo"></div>`
+        : '';
+      const titleBlock = `
+        <div>
+          <div class="pdf-org">Meeting Minutes</div>
+          <div class="pdf-title">${esc(meeting.title || 'Untitled Meeting')}</div>
+        </div>`;
+
+      let h = `<div class="pdf-header">
+        <div class="pdf-header-top">${titleBlock}${logoHtml}</div>
+        <div class="pdf-meta">&#x1F4C5; Date: ${esc(meeting.date ? Utils.formatDate(meeting.date) : 'No date')}</div>
+        <div class="pdf-meta">&#x1F465; Attendees: ${attendeeList.length > 0 ? attendeeList.map(esc).join(', ') : 'None listed'}</div>
+      </div>`;
+
+      if (meeting.notes && meeting.notes.trim()) {
+        h += `<div class="pdf-section">
+          <div class="pdf-section-title">General Notes</div>
+          <div class="pdf-notes-block">${esc(meeting.notes)}</div>
+        </div>`;
+      }
+
+      // Agenda Points (new structure)
+      const agendaPoints = meeting.agendaPoints || [];
+      if (agendaPoints.length > 0) {
+        h += `<div class="pdf-section"><div class="pdf-section-title">Agenda Points</div>`;
+        agendaPoints.forEach((ap, i) => {
+          const tagClass = ap.status === 'resolved' ? 'pdf-tag-resolved'
+                         : ap.status === 'blocked'  ? 'pdf-tag-blocked' : 'pdf-tag-open';
+          const title = ap.title || ap.text || 'Untitled';
+          const desc  = ap.description || ap.notes || '';
+          const assignee = Utils.getAttendeeById(ap.assigneeId, masterAttendees);
+          const deadlineInfo = ap.deadline ? Utils.getDeadlineInfo(ap.deadline, dateMode) : null;
+
+          let metaParts = [];
+          if (assignee) metaParts.push(`&#x1F464; ${esc(Utils.formatAttendee(assignee))}`);
+          if (deadlineInfo) {
+            const overdueStr = deadlineInfo.isOverdue ? ` <strong class="pdf-overdue">(${esc(deadlineInfo.countdown)})</strong>` : ` &bull; ${esc(deadlineInfo.countdown)}`;
+            metaParts.push(`&#x1F4C5; ${esc(deadlineInfo.label)}${overdueStr}`);
+          }
+
+          h += `<div class="pdf-item">
+            <div class="pdf-item-header">
+              <div style="display:flex;gap:8px;flex:1">
+                <span class="pdf-item-num">${i+1}.</span>
+                <div class="pdf-item-body">
+                  <div class="pdf-item-title">${esc(title)}</div>
+                  ${desc ? `<div class="pdf-item-desc">${esc(desc)}</div>` : ''}
+                  ${metaParts.length ? `<div class="pdf-item-meta">${metaParts.join(' &nbsp; ')}</div>` : ''}
+                  ${ap.carriedOverFrom ? `<div class="pdf-carried">&#x21A9; Carried over from previous meeting</div>` : ''}
+                </div>
+              </div>
+              <span class="pdf-tag ${tagClass}">${esc(ap.status)}</span>
+            </div>
+          </div>`;
+        });
+        h += `</div>`;
+      }
+
+      // Backward compat: legacy actionItems
+      const actionItems = meeting.actionItems || [];
+      if (actionItems.length > 0) {
+        h += `<div class="pdf-section"><div class="pdf-section-title">Action Items (Legacy)</div>`;
+        actionItems.forEach((item, i) => {
+          const tc = item.status === 'done' ? 'pdf-tag-resolved' : 'pdf-tag-open';
+          h += `<div class="pdf-item">
+            <div style="display:flex;gap:8px">
+              <span class="pdf-item-num">${i+1}.</span>
+              <div class="pdf-item-body">
+                <div class="pdf-item-title">${esc(item.text || '')} <span class="pdf-tag ${tc}">${esc(item.status)}</span></div>
+                ${item.assignee ? `<div class="pdf-item-meta">&#x1F464; ${esc(item.assignee)}</div>` : ''}
+              </div>
+            </div>
+          </div>`;
+        });
+        h += `</div>`;
+      }
+
+      h += `<div class="pdf-footer">Generated ${new Date().toLocaleString()}`;
+      if (meeting.finalizedAt) h += ` &bull; Finalized: ${Utils.formatTimestamp(meeting.finalizedAt)}`;
+      h += `</div>`;
+      return h;
+    },
+
+    async export(meeting, masterAttendees, settings) {
+      if (!window.html2pdf) throw new Error('html2pdf.js not loaded. Check internet connection.');
+      const container = document.createElement('div');
+      container.style.cssText = 'position:fixed;left:-9999px;top:0;width:740px;background:#fff;';
+      const style = document.createElement('style');
+      style.textContent = this.CSS;
+      container.appendChild(style);
+      const content = document.createElement('div');
+      content.className = 'pdf-wrap';
+      content.innerHTML = this.generateHTML(meeting, masterAttendees, settings);
+      container.appendChild(content);
+      document.body.appendChild(container);
+      try {
+        await html2pdf().set({
+          margin: 0,
+          filename: `meeting-minutes-${meeting.date || 'draft'}.pdf`,
+          html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+          jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true }
+        }).from(content).save();
+      } finally {
+        container.remove();
+      }
+    }
+  };
+
+  /* ======================================================================
+     UI — Rendering functions (no storage calls)
+     ====================================================================== */
+  const UI = {
+    render() {
+      this.renderForm();
+      this.renderAttendeeChecklist();
+      this.renderAgendaList();
+      this.updateCounts();
+      this.updateStatus();
+      this.applyLogo();
+    },
+
+    renderForm() {
+      if (!State.current) return;
+      const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+      set('meeting-title', State.current.title || '');
+      set('meeting-date',  State.current.date  || '');
+      set('meeting-notes', State.current.notes || '');
+    },
+
+    renderAttendeeChecklist() {
+      const container = document.getElementById('attendees-checklist');
+      const emptyHint = document.getElementById('attendees-checklist-empty');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (State.masterAttendees.length === 0) {
+        container.style.display = 'none';
+        if (emptyHint) emptyHint.style.display = 'flex';
+        return;
+      }
+      container.style.display = 'grid';
+      if (emptyHint) emptyHint.style.display = 'none';
+
+      const selectedIds = (State.current && State.current.attendeeIds) || [];
+      State.masterAttendees.forEach(a => {
+        const isSelected = selectedIds.includes(a.id);
+        const item = document.createElement('label');
+        item.className = 'attendee-check-item' + (isSelected ? ' selected' : '');
+        item.innerHTML = `
+          <input type="checkbox" ${isSelected ? 'checked' : ''} data-id="${Utils.escapeHtml(a.id)}">
+          <div class="attendee-check-label">
+            <span class="attendee-check-name">${Utils.escapeHtml(a.name)} ${Utils.escapeHtml(a.surname)}</span>
+            ${a.company ? `<span class="attendee-check-company">${Utils.escapeHtml(a.company)}</span>` : ''}
+          </div>`;
+        item.querySelector('input').addEventListener('change', e => {
+          App.toggleAttendee(a.id, e.target.checked, item);
+        });
+        container.appendChild(item);
+      });
+    },
+
+    renderAgendaList() {
+      const list  = document.getElementById('agenda-list');
+      const empty = document.getElementById('agenda-empty');
+      if (!list) return;
+      list.innerHTML = '';
+      const points = (State.current && State.current.agendaPoints) || [];
+      if (empty) empty.style.display = points.length === 0 ? 'block' : 'none';
+
+      points.forEach(ap => {
+        const isResolved = ap.status === 'resolved';
+        const isBlocked  = ap.status === 'blocked';
+        const isCarried  = !!ap.carriedOverFrom;
+        const dateMode   = State.settings.dateMode;
+        const deadlineInfo = ap.deadline ? Utils.getDeadlineInfo(ap.deadline, dateMode) : null;
+        const assignee   = Utils.getAttendeeById(ap.assigneeId, State.masterAttendees);
+
+        const div = document.createElement('div');
+        div.className = 'agenda-point-item'
+          + (isResolved ? ' status-resolved' : '')
+          + (isBlocked  ? ' status-blocked'  : '');
+
+        const titleClass = isResolved ? 'agenda-point-title resolved-title' : 'agenda-point-title';
+
+        let deadlineBadgeHtml = '';
+        if (deadlineInfo) {
+          deadlineBadgeHtml = `<span class="deadline-badge ${deadlineInfo.cssClass}" title="${Utils.escapeHtml(ap.deadline)}">
+            &#x1F4C5; ${Utils.escapeHtml(deadlineInfo.label)} &bull; ${Utils.escapeHtml(deadlineInfo.countdown)}
+          </span>`;
+        } else {
+          deadlineBadgeHtml = `<span class="deadline-badge no-deadline">No deadline</span>`;
+        }
+
+        const statusOptions = ['open','resolved','blocked'].map(s =>
+          `<option value="${s}" ${ap.status === s ? 'selected' : ''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`
+        ).join('');
+
+        div.innerHTML = `
+          <div class="agenda-point-header">
+            <div class="${titleClass}">${Utils.escapeHtml(ap.title || ap.text || 'Untitled')}</div>
+            <div class="agenda-point-actions">
+              <button class="item-action-btn" title="Edit">&#x270E;</button>
+              <button class="item-action-btn delete" title="Remove">&#x2716;</button>
+            </div>
+          </div>
+          ${ap.description ? `<div class="agenda-point-description">${Utils.escapeHtml(ap.description)}</div>` : ''}
+          <div class="agenda-point-meta">
+            <select class="status-select-inline ${ap.status}" title="Change status">${statusOptions}</select>
+            ${assignee ? `<span class="agenda-meta-pill">&#x1F464; ${Utils.escapeHtml(Utils.formatAttendee(assignee))}</span>` : ''}
+            ${deadlineBadgeHtml}
+            ${isCarried ? `<span class="badge badge-carried">&#x21A9; carried over</span>` : ''}
+          </div>`;
+
+        div.querySelector('.item-action-btn').addEventListener('click', () => App.openEditAgenda(ap.id));
+        div.querySelector('.item-action-btn.delete').addEventListener('click', () => App.removeAgenda(ap.id));
+        div.querySelector('.status-select-inline').addEventListener('change', e => {
+          App.updateAgendaStatus(ap.id, e.target.value, e.target, div);
+        });
+        list.appendChild(div);
+      });
+    },
+
+    renderHistory() {
+      const list  = document.getElementById('history-list');
+      const empty = document.getElementById('history-empty');
+      const count = document.getElementById('history-count');
+      if (!list) return;
+      list.innerHTML = '';
+      if (count) count.textContent = State.meetings.length;
+
+      if (State.meetings.length === 0) {
+        if (empty) empty.style.display = 'block';
+        return;
+      }
+      if (empty) empty.style.display = 'none';
+
+      const sorted = [...State.meetings].sort((a, b) => (b.finalizedAt || 0) - (a.finalizedAt || 0));
+      sorted.forEach(meeting => {
+        const prev    = meeting.previousMeetingId
+          ? State.meetings.find(m => m.id === meeting.previousMeetingId) : null;
+        const changes = State.computeChanges(prev, meeting);
+        const icons   = { added:'➕', resolved:'✅', blocked:'🚫', removed:'🗑️', reopened:'🔄' };
+
+        let changesHtml = '';
+        changes.slice(0, 6).forEach(ch => {
+          const icon = icons[ch.type] || '•';
+          changesHtml += `<div class="change-item">
+            <span>${icon}</span>
+            <span><strong>${Utils.escapeHtml(ch.type)}</strong>: ${Utils.escapeHtml(ch.text)}</span>
+          </div>`;
+        });
+        if (changes.length > 6) changesHtml += `<div class="change-item" style="color:var(--gray-400)">&#x2026;and ${changes.length - 6} more</div>`;
+
+        // Resolve attendees for display
+        const attendeeIds = meeting.attendeeIds || [];
+        const attendeeNames = attendeeIds.length > 0
+          ? attendeeIds.map(id => {
+              const a = Utils.getAttendeeById(id, State.masterAttendees);
+              return a ? `${a.name} ${a.surname}` : null;
+            }).filter(Boolean)
+          : (meeting.attendees || []);
+        const attendeeCount = attendeeNames.length;
+
+        const openCount = (meeting.agendaPoints || []).filter(p => p.status !== 'resolved').length;
+
+        const entry = document.createElement('div');
+        entry.className = 'history-entry';
+        entry.innerHTML = `
+          <div class="history-dot">&#x1F4CB;</div>
+          <div class="history-content">
+            <div class="history-title">${Utils.escapeHtml(meeting.title || 'Untitled Meeting')}</div>
+            <div class="history-meta">
+              ${Utils.formatDate(meeting.date)}
+              &bull; Finalized ${Utils.formatTimestamp(meeting.finalizedAt)}
+              &bull; ${attendeeCount} attendee${attendeeCount !== 1 ? 's' : ''}
+              &bull; ${(meeting.agendaPoints || []).length} agenda points (${openCount} open)
+            </div>
+            ${changesHtml ? `<div class="history-changes">${changesHtml}</div>` : ''}
+            <div class="history-btns">
+              <button class="btn btn-sm btn-outline">&#x1F441; Preview</button>
+              <button class="btn btn-sm btn-primary">&#x1F4E5; Export PDF</button>
+              <button class="btn btn-sm btn-danger">&#x1F5D1; Delete</button>
+            </div>
+          </div>`;
+
+        const btns = entry.querySelectorAll('.history-btns .btn');
+        btns[0].addEventListener('click', () => App.previewPDFForMeeting(meeting.id));
+        btns[1].addEventListener('click', () => App.exportPDFForMeeting(meeting.id));
+        btns[2].addEventListener('click', () => App.deleteHistoryEntry(meeting.id));
+        list.appendChild(entry);
+      });
+    },
+
+    renderSettings() {
+      // Logo
+      const logoUrl = State.settings.logoDataUrl;
+      const settingsImg  = document.getElementById('settings-logo-img');
+      const placeholder  = document.getElementById('settings-logo-placeholder');
+      const removeBtn    = document.getElementById('remove-logo-btn');
+      if (settingsImg) {
+        if (logoUrl) {
+          settingsImg.src     = logoUrl;
+          settingsImg.style.display = 'block';
+          if (placeholder) placeholder.style.display = 'none';
+          if (removeBtn)   removeBtn.style.display   = 'inline-flex';
+        } else {
+          settingsImg.style.display = 'none';
+          if (placeholder) placeholder.style.display = 'block';
+          if (removeBtn)   removeBtn.style.display   = 'none';
+        }
+      }
+
+      // Date mode radio
+      const mode = State.settings.dateMode || 'exact';
+      const radio = document.querySelector(`input[name="dateMode"][value="${mode}"]`);
+      if (radio) radio.checked = true;
+
+      // Attendees master list table
+      this.renderAttendeeMasterList();
+    },
+
+    renderAttendeeMasterList() {
+      const tbody     = document.getElementById('attendees-master-tbody');
+      const table     = document.getElementById('attendees-master-table');
+      const emptyMsg  = document.getElementById('attendees-master-empty');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (State.masterAttendees.length === 0) {
+        if (table)    table.style.display    = 'none';
+        if (emptyMsg) emptyMsg.style.display = 'block';
+        return;
+      }
+      if (table)    table.style.display    = 'table';
+      if (emptyMsg) emptyMsg.style.display = 'none';
+
+      State.masterAttendees.forEach(a => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${Utils.escapeHtml(a.name)}</td>
+          <td>${Utils.escapeHtml(a.surname)}</td>
+          <td>${Utils.escapeHtml(a.company || '—')}</td>
+          <td>
+            <div class="actions-cell">
+              <button class="btn btn-sm btn-outline" data-id="${Utils.escapeHtml(a.id)}">&#x270E;</button>
+              <button class="btn btn-sm btn-danger"  data-id="${Utils.escapeHtml(a.id)}">&#x2716;</button>
+            </div>
+          </td>`;
+        tr.querySelectorAll('button')[0].addEventListener('click', () => App.openEditAttendee(a.id));
+        tr.querySelectorAll('button')[1].addEventListener('click', () => App.deleteAttendee(a.id));
+        tbody.appendChild(tr);
+      });
+    },
+
+    applyLogo() {
+      const logoUrl  = State.settings.logoDataUrl;
+      const imgEl    = document.getElementById('header-logo-img');
+      const iconEl   = document.getElementById('header-logo-icon');
+      if (imgEl && iconEl) {
+        if (logoUrl) {
+          imgEl.src           = logoUrl;
+          imgEl.style.display = 'block';
+          iconEl.style.display = 'none';
+        } else {
+          imgEl.style.display  = 'none';
+          iconEl.style.display = 'block';
+        }
+      }
+    },
+
+    updateCounts() {
+      if (!State.current) return;
+      const el = document.getElementById('agenda-count');
+      if (el) el.textContent = State.current.agendaPoints.length;
+    },
+
+    updateStatus(saving = false) {
+      const dot  = document.getElementById('status-dot');
+      const text = document.getElementById('status-text');
+      if (!dot || !text) return;
+      if (saving) {
+        dot.className = 'status-dot saving'; text.textContent = 'Saving\u2026';
+      } else if (State.isDirty) {
+        dot.className = 'status-dot unsaved'; text.textContent = 'Unsaved changes';
+      } else {
+        dot.className = 'status-dot saved'; text.textContent = 'All saved';
+      }
+    },
+
+    populateAssigneeDropdown(selectEl, selectedId) {
+      if (!selectEl) return;
+      selectEl.innerHTML = '<option value="">— No assignee —</option>';
+      State.masterAttendees.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.id;
+        opt.textContent = `${a.name} ${a.surname}${a.company ? ` (${a.company})` : ''}`;
+        if (a.id === selectedId) opt.selected = true;
+        selectEl.appendChild(opt);
+      });
+    },
+
+    showToast(msg, type = '', duration = 3000) {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = 'toast' + (type ? ` ${type}` : '');
+      toast.textContent = msg;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity   = '0';
+        toast.style.transform = 'translateX(40px)';
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    },
+
+    setLoading(visible) {
+      const el = document.getElementById('loading-overlay');
+      if (el) el.classList.toggle('visible', visible);
+    }
+  };
+
+  /* ======================================================================
+     APP — Controller / event orchestration
+     ====================================================================== */
+  const App = {
+    saveTimeout: null,
+
+    async init() {
+      try {
+        await Storage.init();
+        State.settings        = await Storage.loadSettings();
+        State.masterAttendees = await Storage.loadAttendees();
+        State.meetings        = await Storage.getAllMeetings();
+
+        // Default opening: draft if exists, else pre-fill from latest meeting
+        const draft = await Storage.loadDraft();
+        if (draft) {
+          State.current = draft;
+        } else if (State.meetings.length > 0) {
+          State.current = State.createNewMeeting(State.meetings[0]);
+        } else {
+          State.current = State.createNewMeeting();
+        }
+        State.isDirty = false;
+        UI.render();
+        UI.renderHistory();
+        UI.renderSettings();
+        // Form input auto-save listeners
+        ['meeting-title', 'meeting-date', 'meeting-notes'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.addEventListener('input', () => App.markUnsaved());
+        });
+
+        // Logo upload
+        const logoUpload = document.getElementById('logo-upload');
+        if (logoUpload) logoUpload.addEventListener('change', e => {
+          if (e.target.files[0]) App.saveLogo(e.target.files[0]);
+        });
+
+        // Date mode radios
+        document.querySelectorAll('input[name="dateMode"]').forEach(r => {
+          r.addEventListener('change', () => App.saveDateMode(r.value));
+        });
+
+        // Ctrl/Cmd+S
+        document.addEventListener('keydown', e => {
+          if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); App.saveDraft(); }
+        });
+      } catch (err) {
+        console.error('App.init failed:', err);
+        State.current = State.createNewMeeting();
+        UI.render();
+        UI.showToast('Could not connect to local storage.', 'error');
+      }
+    },
+
+    markUnsaved() {
+      State.syncFromForm();
+      State.isDirty = true;
+      UI.updateStatus();
+      clearTimeout(App.saveTimeout);
+      App.saveTimeout = setTimeout(() => App.saveDraft(true), 1500);
+    },
+
+    async saveDraft(silent = false) {
+      if (!State.current) return;
+      try {
+        UI.updateStatus(true);
+        await Storage.saveDraft(State.current);
+        State.isDirty = false;
+        UI.updateStatus();
+        if (!silent) UI.showToast('Draft saved', 'success');
+      } catch (err) {
+        console.error('saveDraft failed:', err);
+        UI.showToast('Failed to save draft', 'error');
+      }
+    },
+
+    switchView(name) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      const view = document.getElementById('view-' + name);
+      const tab  = document.querySelector(`.nav-tab[data-view="${name}"]`);
+      if (view) view.classList.add('active');
+      if (tab)  tab.classList.add('active');
+      if (name === 'history') {
+        Storage.getAllMeetings().then(m => { State.meetings = m; UI.renderHistory(); });
+      }
+    },
+
+    // ---- Attendee Toggle (checklist) ----
+    toggleAttendee(attendeeId, checked, labelEl) {
+      State.syncFromForm();
+      const idx = State.current.attendeeIds.indexOf(attendeeId);
+      if (checked && idx === -1)  State.current.attendeeIds.push(attendeeId);
+      if (!checked && idx !== -1) State.current.attendeeIds.splice(idx, 1);
+      State.isDirty = true;
+      if (labelEl) labelEl.classList.toggle('selected', checked);
+      App.saveDraft(true);
+    },
+
+    // ---- Agenda Points ----
+    openAddAgenda() {
+      State.editingAgendaId = null;
+      const titleEl = document.getElementById('agenda-modal-title');
+      if (titleEl) titleEl.textContent = '\uD83C\uDFAF Add Agenda Point';
+      document.getElementById('agenda-title-input').value       = '';
+      document.getElementById('agenda-description-input').value = '';
+      document.getElementById('agenda-deadline-input').value    = '';
+      document.getElementById('agenda-status-input').value      = 'open';
+      UI.populateAssigneeDropdown(document.getElementById('agenda-assignee-input'), '');
+      document.getElementById('agenda-modal').classList.add('visible');
+      setTimeout(() => document.getElementById('agenda-title-input').focus(), 50);
+    },
+
+    openEditAgenda(id) {
+      if (!State.current) return;
+      const ap = State.current.agendaPoints.find(p => p.id === id);
+      if (!ap) return;
+      State.editingAgendaId = id;
+      const titleEl = document.getElementById('agenda-modal-title');
+      if (titleEl) titleEl.textContent = '\u270F\uFE0F Edit Agenda Point';
+      document.getElementById('agenda-title-input').value       = ap.title || ap.text || '';
+      document.getElementById('agenda-description-input').value = ap.description || ap.notes || '';
+      document.getElementById('agenda-deadline-input').value    = ap.deadline || ap.dueDate || '';
+      document.getElementById('agenda-status-input').value      = ap.status || 'open';
+      UI.populateAssigneeDropdown(document.getElementById('agenda-assignee-input'), ap.assigneeId || '');
+      document.getElementById('agenda-modal').classList.add('visible');
+      setTimeout(() => document.getElementById('agenda-title-input').focus(), 50);
+    },
+
+    saveAgendaPoint() {
+      const title       = (document.getElementById('agenda-title-input').value || '').trim();
+      const description = (document.getElementById('agenda-description-input').value || '').trim();
+      const assigneeId  = document.getElementById('agenda-assignee-input').value || '';
+      const deadline    = document.getElementById('agenda-deadline-input').value || '';
+      const status      = document.getElementById('agenda-status-input').value || 'open';
+
+      if (!title) { UI.showToast('Title is required', 'warning'); return; }
+
+      if (State.editingAgendaId) {
+        State.updateAgendaPoint(State.editingAgendaId, { title, description, assigneeId, deadline, status });
+        UI.showToast('Agenda point updated', 'success');
+      } else {
+        State.addAgendaPoint(title, description, assigneeId, deadline, status);
+        UI.showToast('Agenda point added', 'success');
+      }
+      App.closeModal('agenda-modal');
+      UI.renderAgendaList();
+      UI.updateCounts();
+      App.saveDraft(true);
+    },
+
+    updateAgendaStatus(id, newStatus, selectEl, itemEl) {
+      State.updateAgendaPoint(id, { status: newStatus });
+      // Update CSS classes without full re-render for better UX
+      if (selectEl) {
+        selectEl.className = `status-select-inline ${newStatus}`;
+      }
+      if (itemEl) {
+        itemEl.classList.toggle('status-resolved', newStatus === 'resolved');
+        itemEl.classList.toggle('status-blocked',  newStatus === 'blocked');
+        const titleEl = itemEl.querySelector('.agenda-point-title');
+        if (titleEl) titleEl.classList.toggle('resolved-title', newStatus === 'resolved');
+      }
+      App.saveDraft(true);
+    },
+
+    removeAgenda(id) {
+      if (!confirm('Remove this agenda point?')) return;
+      State.removeAgendaPoint(id);
+      UI.renderAgendaList();
+      UI.updateCounts();
+      App.saveDraft(true);
+    },
+
+    // ---- Settings: Logo ----
+    async saveLogo(file) {
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      if (!allowedTypes.includes(file.type)) {
+        UI.showToast('Only JPEG and PNG files are supported', 'warning'); return;
+      }
+      const reader = new FileReader();
+      reader.onload = async e => {
+        State.settings.logoDataUrl = e.target.result;
+        await Storage.saveSettings(State.settings);
+        UI.applyLogo();
+        UI.renderSettings();
+        UI.showToast('Logo saved', 'success');
+      };
+      reader.readAsDataURL(file);
+    },
+
+    async removeLogo() {
+      State.settings.logoDataUrl = null;
+      await Storage.saveSettings(State.settings);
+      const uploadInput = document.getElementById('logo-upload');
+      if (uploadInput) uploadInput.value = '';
+      UI.applyLogo();
+      UI.renderSettings();
+      UI.showToast('Logo removed', 'success');
+    },
+
+    // ---- Settings: Date Mode ----
+    async saveDateMode(mode) {
+      State.settings.dateMode = mode;
+      await Storage.saveSettings(State.settings);
+      UI.renderAgendaList(); // re-render to update deadline display
+      UI.renderHistory();
+      UI.showToast(`Date mode: ${mode === 'cw' ? 'Calendar Weeks' : 'Exact Dates'}`, 'success');
+    },
+
+    // ---- Settings: Attendee CRUD ----
+    openAddAttendee() {
+      State.editingAttendeeId = null;
+      document.getElementById('attendee-modal-title').textContent = '\uD83D\uDC64 Add Attendee';
+      document.getElementById('attendee-name-input').value    = '';
+      document.getElementById('attendee-surname-input').value = '';
+      document.getElementById('attendee-company-input').value = '';
+      document.getElementById('attendee-modal').classList.add('visible');
+      setTimeout(() => document.getElementById('attendee-name-input').focus(), 50);
+    },
+
+    openEditAttendee(id) {
+      const a = State.masterAttendees.find(x => x.id === id);
+      if (!a) return;
+      State.editingAttendeeId = id;
+      document.getElementById('attendee-modal-title').textContent = '\u270F\uFE0F Edit Attendee';
+      document.getElementById('attendee-name-input').value    = a.name;
+      document.getElementById('attendee-surname-input').value = a.surname;
+      document.getElementById('attendee-company-input').value = a.company || '';
+      document.getElementById('attendee-modal').classList.add('visible');
+      setTimeout(() => document.getElementById('attendee-name-input').focus(), 50);
+    },
+
+    async saveAttendee() {
+      const name    = (document.getElementById('attendee-name-input').value    || '').trim();
+      const surname = (document.getElementById('attendee-surname-input').value || '').trim();
+      const company = (document.getElementById('attendee-company-input').value || '').trim();
+      if (!name || !surname) { UI.showToast('Name and surname are required', 'warning'); return; }
+
+      if (State.editingAttendeeId) {
+        const a = State.masterAttendees.find(x => x.id === State.editingAttendeeId);
+        if (a) { a.name = name; a.surname = surname; a.company = company; }
+      } else {
+        State.masterAttendees.push({ id: Utils.uuid(), name, surname, company });
+      }
+      await Storage.saveAttendees(State.masterAttendees);
+      App.closeModal('attendee-modal');
+      UI.renderAttendeeMasterList();
+      UI.renderAttendeeChecklist(); // refresh checklist in editor
+      UI.showToast(State.editingAttendeeId ? 'Attendee updated' : 'Attendee added', 'success');
+    },
+
+    async deleteAttendee(id) {
+      if (!confirm('Remove this person from the master list?')) return;
+      State.masterAttendees = State.masterAttendees.filter(a => a.id !== id);
+      // Also remove from current draft's attendeeIds
+      if (State.current) {
+        State.current.attendeeIds = State.current.attendeeIds.filter(x => x !== id);
+        App.saveDraft(true);
+      }
+      await Storage.saveAttendees(State.masterAttendees);
+      UI.renderAttendeeMasterList();
+      UI.renderAttendeeChecklist();
+      UI.showToast('Attendee removed', 'success');
+    },
+
+    // ---- Load Previous ----
+    openLoadPrevious() {
+      if (State.meetings.length === 0) {
+        UI.showToast('No previous meetings found', 'warning'); return;
+      }
+      const sel = document.getElementById('load-previous-select');
+      if (!sel) return;
+      sel.innerHTML = '';
+      State.meetings.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = `${m.title || 'Untitled'} — ${Utils.formatDateShort(m.date)}`;
+        sel.appendChild(opt);
+      });
+      document.getElementById('load-previous-modal').classList.add('visible');
+    },
+
+    async confirmLoadPrevious() {
+      const sel = document.getElementById('load-previous-select');
+      if (!sel || !sel.value) return;
+      const prev = await Storage.getMeeting(sel.value);
+      if (!prev) { UI.showToast('Meeting not found', 'error'); return; }
+      App.closeModal('load-previous-modal');
+      State.current = State.createNewMeeting(prev);
+      State.isDirty = true;
+      UI.render();
+      await App.saveDraft(true);
+      UI.showToast(`Draft created from: ${prev.title || 'previous meeting'}`, 'success');
+      App.switchView('editor');
+    },
+
+    // ---- Finalize ----
+    finalizeMeeting() {
+      State.syncFromForm();
+      if (!State.current || !State.current.title.trim()) {
+        UI.showToast('Please enter a meeting title before finalizing', 'warning');
+        const el = document.getElementById('meeting-title');
+        if (el) el.focus();
+        return;
+      }
+      const m    = State.current;
+      const open = (m.agendaPoints || []).filter(p => p.status !== 'resolved').length;
+      const summary = document.getElementById('finalize-summary');
+      if (summary) {
+        const attendeeIds = m.attendeeIds || [];
+        const attendeeCount = attendeeIds.length;
+        summary.innerHTML = `
+          <p><strong>${Utils.escapeHtml(m.title)}</strong></p>
+          <p>&#x1F4C5; ${Utils.formatDate(m.date)}</p>
+          <p>&#x1F465; ${attendeeCount} attendee${attendeeCount !== 1 ? 's' : ''}</p>
+          <p>&#x1F3AF; ${(m.agendaPoints||[]).length} agenda points &mdash; <strong>${open} open / blocked</strong></p>
+          ${open > 0
+            ? `<p style="margin-top:10px;color:var(--warning)">&#x26A0;&#xFE0F; ${open} open item(s) can be carried over to next meeting.</p>`
+            : `<p style="margin-top:10px;color:var(--success)">&#x2705; All agenda points resolved!</p>`}`;
+      }
+      document.getElementById('finalize-modal').classList.add('visible');
+    },
+
+    async confirmFinalize() {
+      App.closeModal('finalize-modal');
+      UI.setLoading(true);
+      try {
+        State.syncFromForm();
+        State.current.finalizedAt = Date.now();
+        await Storage.saveMeeting(State.current);  // save to history
+        await Storage.clearDraft();                 // remove draft
+        State.meetings = await Storage.getAllMeetings();
+        UI.renderHistory();
+        UI.showToast('Meeting finalized and saved to history!', 'success', 4000);
+        // Start new draft from just-finalized meeting
+        const finalized = State.current;
+        State.current = State.createNewMeeting(finalized);
+        State.isDirty = true;
+        UI.render();
+        await App.saveDraft(true);
+      } catch (err) {
+        console.error('confirmFinalize failed:', err);
+        UI.showToast('Failed to finalize meeting', 'error');
+      } finally {
+        UI.setLoading(false);
+      }
+    },
+
+    // ---- PDF Preview / Export ----
+    previewPDF() {
+      State.syncFromForm();
+      State.previewMeetingId = null; // current draft
+      const content = document.getElementById('pdf-content');
+      const preview = document.getElementById('pdf-preview');
+      const label   = document.getElementById('pdf-preview-label');
+      if (!content || !preview) return;
+      content.innerHTML = `<style>${PDFGen.CSS}</style><div class="pdf-wrap">${PDFGen.generateHTML(State.current, State.masterAttendees, State.settings)}</div>`;
+      if (label) label.textContent = 'Draft Preview';
+      preview.classList.add('visible');
+    },
+
+    async previewPDFForMeeting(id) {
+      const meeting = await Storage.getMeeting(id);
+      if (!meeting) { UI.showToast('Meeting not found', 'error'); return; }
+      State.previewMeetingId = id;
+      const content = document.getElementById('pdf-content');
+      const preview = document.getElementById('pdf-preview');
+      const label   = document.getElementById('pdf-preview-label');
+      if (!content || !preview) return;
+      content.innerHTML = `<style>${PDFGen.CSS}</style><div class="pdf-wrap">${PDFGen.generateHTML(meeting, State.masterAttendees, State.settings)}</div>`;
+      if (label) label.textContent = `Preview: ${meeting.title || 'Untitled'}`;
+      preview.classList.add('visible');
+    },
+
+    async exportPDFFromPreview() {
+      UI.setLoading(true);
+      try {
+        if (State.previewMeetingId) {
+          const meeting = await Storage.getMeeting(State.previewMeetingId);
+          if (meeting) await PDFGen.export(meeting, State.masterAttendees, State.settings);
+        } else {
+          State.syncFromForm();
+          await PDFGen.export(State.current, State.masterAttendees, State.settings);
+        }
+        App.closePDFPreview();
+        UI.showToast('PDF exported!', 'success');
+      } catch (err) {
+        console.error('exportPDF failed:', err);
+        UI.showToast('PDF export failed: ' + err.message, 'error');
+      } finally {
+        UI.setLoading(false);
+      }
+    },
+
+    async exportPDFForMeeting(id) {
+      const meeting = await Storage.getMeeting(id);
+      if (!meeting) { UI.showToast('Meeting not found', 'error'); return; }
+      UI.setLoading(true);
+      try {
+        await PDFGen.export(meeting, State.masterAttendees, State.settings);
+        UI.showToast(`PDF exported: ${meeting.title || 'meeting'}.pdf`, 'success');
+      } catch (err) {
+        console.error('exportPDFForMeeting failed:', err);
+        UI.showToast('PDF export failed: ' + err.message, 'error');
+      } finally {
+        UI.setLoading(false);
+      }
+    },
+
+    closePDFPreview() {
+      const el = document.getElementById('pdf-preview');
+      if (el) el.classList.remove('visible');
+      State.previewMeetingId = null;
+    },
+
+    async deleteHistoryEntry(id) {
+      if (!confirm('Delete this meeting from history? This cannot be undone.')) return;
+      try {
+        await Storage.deleteMeeting(id);
+        State.meetings = State.meetings.filter(m => m.id !== id);
+        UI.renderHistory();
+        UI.showToast('Meeting deleted from history', 'success');
+      } catch (err) {
+        console.error('deleteHistoryEntry failed:', err);
+        UI.showToast('Failed to delete meeting', 'error');
+      }
+    },
+
+    closeModal(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('visible');
+      State.editingAgendaId   = null;
+      State.editingAttendeeId = null;
+    }
+  };
+
+  /* ======================================================================
+     BOOTSTRAP
+     ====================================================================== */
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.addEventListener('click', () => App.switchView(tab.dataset.view));
+  });
+
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) App.closeModal(overlay.id);
+    });
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      App.closePDFPreview();
+      document.querySelectorAll('.modal-overlay.visible').forEach(m => App.closeModal(m.id));
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!window._STORAGE_OK) {
+      document.body.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f9fafb;padding:24px;font-family:system-ui,sans-serif;text-align:center;">
+          <div style="max-width:480px;">
+            <div style="font-size:48px;margin-bottom:24px;">&#x26A0;&#xFE0F;</div>
+            <h1 style="font-size:22px;font-weight:700;color:#111827;margin-bottom:12px;">Storage module missing</h1>
+            <p style="font-size:15px;color:#6b7280;line-height:1.6;margin-bottom:24px;">
+              Please download and include <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-family:monospace;">storage.js</code>
+              to use this application. Place it in the same folder as
+              <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-family:monospace;">index.html</code>.
+            </p>
+            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;font-size:13px;color:#9ca3af;font-family:monospace;text-align:left;line-height:1.8;">
+              &#x1F4C1; your-folder/<br>
+              &nbsp;&nbsp;&#x251C;&#x2500;&#x2500; index.html<br>
+              &nbsp;&nbsp;&#x2514;&#x2500;&#x2500; storage.js &nbsp;<span style="color:#dc2626;">&#x2190; missing</span>
+            </div>
+          </div>
+        </div>`;
+      return;
+    }
+    App.init();
+  });
+  </script>
+
+</body>
+</html>

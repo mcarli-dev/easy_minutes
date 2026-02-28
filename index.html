@@ -1145,7 +1145,7 @@
         await html2pdf().set({
           margin: 0,
           filename: `meeting-minutes-${meeting.date || 'draft'}.pdf`,
-          html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: bg },
+          html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: bg, letterRendering: true },
           jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true }
         }).from(content).save();
       } finally {

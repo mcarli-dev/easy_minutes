@@ -13,7 +13,7 @@ It is designed to be:
 ## 📸 Screenshot
 
 <p align="center">
-  <img src="assets/screenshot-main.png" width="800" />
+  <img src="assets/screenshot-main.png" width="400" />
 </p>
 
 ---

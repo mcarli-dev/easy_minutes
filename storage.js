@@ -116,7 +116,7 @@ const Storage = {
   async loadSettings() {
     const tx = this.db.transaction('settings', 'readonly');
     const result = await this._req(tx.objectStore('settings').get('app'));
-    return result || { id: 'app', dateMode: 'exact', logoDataUrl: null };
+    return result || { id: 'app', dateMode: 'exact', logoDataUrl: null, pdfAccentColor: '#4b5563', pdfBgColor: '#f3f4f6' };
   },
 
   // ---- Attendees Master List ----

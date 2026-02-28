@@ -274,6 +274,22 @@
     .logo-preview-box .logo-placeholder { font-size: 13px; color: var(--gray-400); text-align: center; padding: 8px; }
     .file-hint { font-size: 12px; color: var(--gray-400); margin-top: 4px; }
 
+    /* ===== COLOR SWATCHES ===== */
+    .color-swatch-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+    .color-swatch {
+      width: 30px; height: 30px; border-radius: 50%;
+      border: 2px solid transparent; cursor: pointer; flex-shrink: 0;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .color-swatch:hover { transform: scale(1.15); }
+    .color-swatch.active { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--gray-700); }
+    .pdf-color-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+    .pdf-color-row label { font-size: 13px; color: var(--gray-600); white-space: nowrap; }
+    input[type="color"].color-picker {
+      width: 36px; height: 28px; padding: 2px; cursor: pointer;
+      border: 1px solid var(--gray-300); border-radius: var(--radius); background: #fff;
+    }
+
     /* ===== ADD ITEM FIELDS ===== */
     .add-item-fields {
       display: none; flex-direction: column; gap: 10px;
@@ -526,6 +542,43 @@
                 <input type="file" id="logo-upload" accept=".jpg,.jpeg,.png" style="padding:6px;">
               </div>
               <p class="file-hint">Logo will appear top-left in the app and in exported PDFs.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PDF Export Colors -->
+      <div class="card">
+        <div class="card-header">
+          <h2>&#x1F3A8; PDF Export Colors</h2>
+        </div>
+        <div class="card-body">
+          <div class="form-group" style="margin-bottom:20px;">
+            <label>Accent Color</label>
+            <div class="color-swatch-group" id="pdf-accent-swatches">
+              <button class="color-swatch" data-color="#4b5563" title="Neutral Gray (default)" style="background:#4b5563;"></button>
+              <button class="color-swatch" data-color="#2563eb" title="Blue" style="background:#2563eb;"></button>
+              <button class="color-swatch" data-color="#0d9488" title="Teal" style="background:#0d9488;"></button>
+              <button class="color-swatch" data-color="#16a34a" title="Green" style="background:#16a34a;"></button>
+              <button class="color-swatch" data-color="#7c3aed" title="Purple" style="background:#7c3aed;"></button>
+              <button class="color-swatch" data-color="#dc2626" title="Red" style="background:#dc2626;"></button>
+            </div>
+            <div class="pdf-color-row">
+              <label for="pdf-accent-custom">Custom:</label>
+              <input type="color" id="pdf-accent-custom" class="color-picker">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Background Color</label>
+            <div class="color-swatch-group" id="pdf-bg-swatches">
+              <button class="color-swatch" data-color="#f3f4f6" title="Light Gray (default)" style="background:#f3f4f6;border-color:#d1d5db;"></button>
+              <button class="color-swatch" data-color="#ffffff" title="White" style="background:#ffffff;border-color:#d1d5db;"></button>
+              <button class="color-swatch" data-color="#fafaf9" title="Warm White" style="background:#fafaf9;border-color:#d1d5db;"></button>
+              <button class="color-swatch" data-color="#edf0f7" title="Blue Gray" style="background:#edf0f7;border-color:#d1d5db;"></button>
+            </div>
+            <div class="pdf-color-row">
+              <label for="pdf-bg-custom">Custom:</label>
+              <input type="color" id="pdf-bg-custom" class="color-picker">
             </div>
           </div>
         </div>
@@ -840,7 +893,7 @@
     isDirty: false,
     meetings: [],
     masterAttendees: [],
-    settings: { dateMode: 'exact', logoDataUrl: null },
+    settings: { dateMode: 'exact', logoDataUrl: null, pdfAccentColor: '#4b5563', pdfBgColor: '#f3f4f6' },
     editingAgendaId: null,
     editingAttendeeId: null,
     previewMeetingId: null, // which meeting is open in PDF preview
@@ -954,36 +1007,22 @@
      PDFGEN — Report generation (includes logo, attendees, agenda points)
      ====================================================================== */
   const PDFGen = {
-    CSS: `
-      *{box-sizing:border-box;margin:0;padding:0}
-      body{font-family:Georgia,'Times New Roman',serif;font-size:13px;line-height:1.6;color:#222}
-      .pdf-wrap{width:740px;padding:48px 48px 40px;background:#fff}
-      .pdf-header{padding-bottom:20px;border-bottom:2px solid #1a1a1a;margin-bottom:28px}
-      .pdf-header-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}
-      .pdf-logo img{max-height:52px;max-width:140px;object-fit:contain}
-      .pdf-org{font-size:10px;text-transform:uppercase;letter-spacing:.15em;color:#777;margin-bottom:6px;font-family:Arial,sans-serif}
-      .pdf-title{font-size:24px;font-weight:bold;color:#111;margin-bottom:4px}
-      .pdf-meta{font-size:12px;color:#555;margin-bottom:3px}
-      .pdf-section{margin-bottom:24px}
-      .pdf-section-title{font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.12em;font-family:Arial,sans-serif;color:#444;border-bottom:1px solid #d0d0d0;padding-bottom:5px;margin-bottom:14px}
-      .pdf-item{margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #f0f0f0}
-      .pdf-item:last-child{border-bottom:none}
-      .pdf-item-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px}
-      .pdf-item-num{color:#999;min-width:22px;font-size:12px;flex-shrink:0;padding-top:2px}
-      .pdf-item-body{flex:1}
-      .pdf-item-title{font-size:14px;font-weight:bold;color:#111;margin-bottom:3px}
-      .pdf-item-desc{font-size:12px;color:#444;margin-bottom:6px;line-height:1.5}
-      .pdf-tag{display:inline-block;font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:3px;font-family:Arial,sans-serif;flex-shrink:0}
-      .pdf-tag-open{background:#dbeafe;color:#1d4ed8}
-      .pdf-tag-resolved{background:#dcfce7;color:#15803d}
-      .pdf-tag-blocked{background:#fee2e2;color:#dc2626}
-      .pdf-item-meta{font-size:11px;color:#888;display:flex;gap:12px;flex-wrap:wrap;margin-top:4px}
-      .pdf-overdue{color:#dc2626;font-weight:600}
-      .pdf-carried{font-size:10px;color:#d97706;margin-top:3px;font-family:Arial,sans-serif}
-      .pdf-attendees{font-size:13px;color:#333;line-height:1.8}
-      .pdf-notes-block{font-size:13px;color:#333;white-space:pre-wrap;line-height:1.7}
-      .pdf-footer{margin-top:48px;padding-top:12px;border-top:1px solid #e0e0e0;font-size:10px;color:#bbb;text-align:center;font-family:Arial,sans-serif}
-    `,
+    _hexToRgb(hex) {
+      const n = parseInt((hex || '#4b5563').replace('#', ''), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    },
+    _darken(hex, factor) {
+      const [r, g, b] = this._hexToRgb(hex);
+      const d = v => Math.max(0, Math.round(v * (1 - factor)));
+      return '#' + [d(r), d(g), d(b)].map(v => v.toString(16).padStart(2, '0')).join('');
+    },
+    buildCSS(accentColor, bgColor) {
+      const accent = accentColor || '#4b5563';
+      const bg = bgColor || '#f3f4f6';
+      const accentDark = this._darken(accent, 0.4);
+      const bgDarker = this._darken(bg, 0.06);
+      return `*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,Arial,sans-serif;font-size:13px;line-height:1.6;color:#222;background:${bg}}.pdf-wrap{width:794px;background:${bg}}.pdf-header{background:linear-gradient(135deg,${accentDark} 0%,${accent} 100%);padding:32px 40px 24px;margin-bottom:0}.pdf-header-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.pdf-logo img{max-height:52px;max-width:140px;object-fit:contain;filter:brightness(0) invert(1)}.pdf-org{font-size:10px;text-transform:uppercase;letter-spacing:.15em;color:rgba(255,255,255,0.75);margin-bottom:6px}.pdf-title{font-size:24px;font-weight:bold;color:#fff;margin-bottom:4px}.pdf-meta-bar{display:flex;gap:24px;flex-wrap:wrap}.pdf-meta{font-size:12px;color:rgba(255,255,255,0.80);margin-bottom:0}.pdf-body{padding:32px 40px 8px}.pdf-section{margin-bottom:28px}.pdf-section-title{font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.12em;color:${accent};margin-bottom:14px;padding-left:10px;border-left:3px solid ${accent};border-radius:2px}.pdf-item{background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:10px}.pdf-item-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px}.pdf-item-num{color:#94a3b8;min-width:22px;font-size:12px;font-weight:bold;flex-shrink:0;padding-top:2px}.pdf-item-body{flex:1}.pdf-item-title{font-size:14px;font-weight:bold;color:#111;margin-bottom:3px}.pdf-item-desc{font-size:12px;color:#444;margin-bottom:6px;line-height:1.5}.pdf-tag{display:inline-block;font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;padding:3px 10px;border-radius:20px;flex-shrink:0}.pdf-tag-open{background:#dbeafe;color:#1d4ed8}.pdf-tag-resolved{background:#dcfce7;color:#15803d}.pdf-tag-blocked{background:#fee2e2;color:#dc2626}.pdf-item-meta{font-size:11px;color:#888;display:flex;gap:12px;flex-wrap:wrap;margin-top:4px}.pdf-overdue{color:#dc2626;font-weight:600}.pdf-carried{font-size:10px;color:#d97706;margin-top:3px}.pdf-notes-block{font-size:13px;color:#333;white-space:pre-wrap;line-height:1.7;background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px}.pdf-footer{background:${bgDarker};padding:14px 40px;font-size:10px;color:#94a3b8;text-align:center}`;
+    },
 
     generateHTML(meeting, masterAttendees, settings) {
       const esc      = Utils.escapeHtml;
@@ -1013,9 +1052,11 @@
 
       let h = `<div class="pdf-header">
         <div class="pdf-header-top">${titleBlock}${logoHtml}</div>
-        <div class="pdf-meta">&#x1F4C5; Date: ${esc(meeting.date ? Utils.formatDate(meeting.date) : 'No date')}</div>
-        <div class="pdf-meta">&#x1F465; Attendees: ${attendeeList.length > 0 ? attendeeList.map(esc).join(', ') : 'None listed'}</div>
-      </div>`;
+        <div class="pdf-meta-bar">
+          <div class="pdf-meta">Date: ${esc(meeting.date ? Utils.formatDate(meeting.date) : 'No date')}</div>
+          <div class="pdf-meta">Attendees: ${attendeeList.length > 0 ? attendeeList.map(esc).join(', ') : 'None listed'}</div>
+        </div>
+      </div><div class="pdf-body">`;
 
       if (meeting.notes && meeting.notes.trim()) {
         h += `<div class="pdf-section">
@@ -1080,7 +1121,7 @@
         h += `</div>`;
       }
 
-      h += `<div class="pdf-footer">Generated ${new Date().toLocaleString()}`;
+      h += `</div><div class="pdf-footer">Generated ${new Date().toLocaleString()}`;
       if (meeting.finalizedAt) h += ` &bull; Finalized: ${Utils.formatTimestamp(meeting.finalizedAt)}`;
       h += `</div>`;
       return h;
@@ -1088,10 +1129,12 @@
 
     async export(meeting, masterAttendees, settings) {
       if (!window.html2pdf) throw new Error('html2pdf.js not loaded. Check internet connection.');
+      const accent = (settings && settings.pdfAccentColor) || '#4b5563';
+      const bg     = (settings && settings.pdfBgColor)     || '#f3f4f6';
       const container = document.createElement('div');
-      container.style.cssText = 'position:fixed;left:-9999px;top:0;width:740px;background:#fff;';
+      container.style.cssText = `position:fixed;left:-9999px;top:0;width:794px;background:${bg};`;
       const style = document.createElement('style');
-      style.textContent = this.CSS;
+      style.textContent = this.buildCSS(accent, bg);
       container.appendChild(style);
       const content = document.createElement('div');
       content.className = 'pdf-wrap';
@@ -1102,7 +1145,7 @@
         await html2pdf().set({
           margin: 0,
           filename: `meeting-minutes-${meeting.date || 'draft'}.pdf`,
-          html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+          html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: bg },
           jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true }
         }).from(content).save();
       } finally {
@@ -1320,6 +1363,22 @@
       const radio = document.querySelector(`input[name="dateMode"][value="${mode}"]`);
       if (radio) radio.checked = true;
 
+      // PDF accent color swatches + custom picker
+      const accentColor = State.settings.pdfAccentColor || '#4b5563';
+      document.querySelectorAll('#pdf-accent-swatches .color-swatch').forEach(s => {
+        s.classList.toggle('active', s.dataset.color === accentColor);
+      });
+      const accentCustom = document.getElementById('pdf-accent-custom');
+      if (accentCustom) accentCustom.value = accentColor;
+
+      // PDF background color swatches + custom picker
+      const bgColor = State.settings.pdfBgColor || '#f3f4f6';
+      document.querySelectorAll('#pdf-bg-swatches .color-swatch').forEach(s => {
+        s.classList.toggle('active', s.dataset.color === bgColor);
+      });
+      const bgCustom = document.getElementById('pdf-bg-custom');
+      if (bgCustom) bgCustom.value = bgColor;
+
       // Attendees master list table
       this.renderAttendeeMasterList();
     },
@@ -1466,6 +1525,20 @@
         document.querySelectorAll('input[name="dateMode"]').forEach(r => {
           r.addEventListener('change', () => App.saveDateMode(r.value));
         });
+
+        // PDF accent color swatches + custom picker
+        document.querySelectorAll('#pdf-accent-swatches .color-swatch').forEach(btn => {
+          btn.addEventListener('click', () => App.savePdfAccentColor(btn.dataset.color));
+        });
+        const accentPicker = document.getElementById('pdf-accent-custom');
+        if (accentPicker) accentPicker.addEventListener('change', e => App.savePdfAccentColor(e.target.value));
+
+        // PDF background color swatches + custom picker
+        document.querySelectorAll('#pdf-bg-swatches .color-swatch').forEach(btn => {
+          btn.addEventListener('click', () => App.savePdfBgColor(btn.dataset.color));
+        });
+        const bgPicker = document.getElementById('pdf-bg-custom');
+        if (bgPicker) bgPicker.addEventListener('change', e => App.savePdfBgColor(e.target.value));
 
         // Ctrl/Cmd+S
         document.addEventListener('keydown', e => {
@@ -1626,6 +1699,19 @@
       UI.showToast('Logo removed', 'success');
     },
 
+    // ---- Settings: PDF Colors ----
+    async savePdfAccentColor(color) {
+      State.settings.pdfAccentColor = color;
+      await Storage.saveSettings(State.settings);
+      UI.renderSettings();
+    },
+
+    async savePdfBgColor(color) {
+      State.settings.pdfBgColor = color;
+      await Storage.saveSettings(State.settings);
+      UI.renderSettings();
+    },
+
     // ---- Settings: Date Mode ----
     async saveDateMode(mode) {
       State.settings.dateMode = mode;
@@ -1782,7 +1868,7 @@
       const preview = document.getElementById('pdf-preview');
       const label   = document.getElementById('pdf-preview-label');
       if (!content || !preview) return;
-      content.innerHTML = `<style>${PDFGen.CSS}</style><div class="pdf-wrap">${PDFGen.generateHTML(State.current, State.masterAttendees, State.settings)}</div>`;
+      content.innerHTML = `<style>${PDFGen.buildCSS(State.settings.pdfAccentColor, State.settings.pdfBgColor)}</style><div class="pdf-wrap">${PDFGen.generateHTML(State.current, State.masterAttendees, State.settings)}</div>`;
       if (label) label.textContent = 'Draft Preview';
       preview.classList.add('visible');
     },
@@ -1795,7 +1881,7 @@
       const preview = document.getElementById('pdf-preview');
       const label   = document.getElementById('pdf-preview-label');
       if (!content || !preview) return;
-      content.innerHTML = `<style>${PDFGen.CSS}</style><div class="pdf-wrap">${PDFGen.generateHTML(meeting, State.masterAttendees, State.settings)}</div>`;
+      content.innerHTML = `<style>${PDFGen.buildCSS(State.settings.pdfAccentColor, State.settings.pdfBgColor)}</style><div class="pdf-wrap">${PDFGen.generateHTML(meeting, State.masterAttendees, State.settings)}</div>`;
       if (label) label.textContent = `Preview: ${meeting.title || 'Untitled'}`;
       preview.classList.add('visible');
     },

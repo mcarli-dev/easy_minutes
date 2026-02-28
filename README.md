@@ -10,6 +10,12 @@ It is designed to be:
 * 🧼 Cache-safe
 * ⚡ Lightweight (no build required)
 
+## 📸 Screenshot
+
+<p align="center">
+  <img src="assets/screenshot-main.png" width="800" />
+</p>
+
 ---
 
 ## 🏗 Architecture

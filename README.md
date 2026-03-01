@@ -105,8 +105,10 @@ No build system required.
 
 1. Download `index.html`
 2. Download `storage.js`
-3. Place both files in the same folder
-4. Open `index.html` in your browser
+3. Download `db.json`
+4. Place both files in the same folder
+5. Open `index.html` in your browser
+6. Select working folder
 
 ---
 
@@ -171,39 +173,12 @@ From History you can:
 
 ---
 
-## 🧼 Isolation Guarantee
-
-The application guarantees:
-
-* No embedded business data in `index.html`
-* No hidden browser persistence
-* No supplier data leakage
-* Deterministic clean startup
-* Portable architecture
-
-It behaves like a reusable meeting engine.
-
----
-
 ## 📁 Project Structure
 
 ```
 /project-folder
 │
 ├── index.html
-├── index_ux_improved.html
+├── db.json
 └── storage.js
 ```
-
----
-
-## 🎯 Design Principles
-
-* Strict UI / storage separation
-* No hidden state
-* Deterministic boot behavior
-* Supplier-level isolation
-* Lightweight & portable
-* Zero setup friction
-
----

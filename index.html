@@ -988,20 +988,19 @@
         m.title            = prev.title || '';
         m.attendeeIds      = [...(prev.attendeeIds || [])];
         m.previousMeetingId = prev.id;
-        // Carry over open / blocked agenda points
+        // Carry over all agenda points, preserving their exact status.
+        // Resolved points are included but remain visually greyed out in the UI.
         (prev.agendaPoints || []).forEach(ap => {
-          if (ap.status === 'open' || ap.status === 'blocked') {
-            m.agendaPoints.push({
-              id: Utils.uuid(),
-              title: ap.title || ap.text || '',
-              description: ap.description || ap.notes || '',
-              assigneeId: ap.assigneeId || '',
-              deadline: ap.deadline || ap.dueDate || '',
-              status: 'open',
-              createdAt: Date.now(),
-              carriedOverFrom: prev.id
-            });
-          }
+          m.agendaPoints.push({
+            id: Utils.uuid(),
+            title: ap.title || ap.text || '',
+            description: ap.description || ap.notes || '',
+            assigneeId: ap.assigneeId || '',
+            deadline: ap.deadline || ap.dueDate || '',
+            status: ap.status || 'open',
+            createdAt: Date.now(),
+            carriedOverFrom: prev.id
+          });
         });
       }
       return m;

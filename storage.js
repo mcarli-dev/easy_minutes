@@ -1,134 +1,141 @@
 /* ======================================================================
-   STORAGE — All IndexedDB persistence logic
-   Manages: Settings, Attendees master list, Logo (via settings),
-            Draft, History entries
-   No storage logic should live in UI components.
+   STORAGE — File System Access API persistence
+   All data lives in db.json, physically inside the project folder.
+   Portable: copy/zip/move the folder and all data travels with it.
+
+   NO directory handles are persisted between sessions.
+   Every page load requires a fresh folder selection so the app always
+   operates on the folder that contains the currently-open index.html,
+   never on a previously stored path from another location.
    ====================================================================== */
 'use strict';
 
 const Storage = {
-  db: null,
-  DB_NAME: (() => {
+  /* In-memory working copy of the database */
+  _data: {
+    settings:  { id: 'app', dateMode: 'exact', logoDataUrl: null, pdfAccentColor: '#4b5563', pdfBgColor: '#f3f4f6' },
+    attendees: [],
+    meetings:  [],
+    draft:     null
+  },
+
+  _dirHandle:  null,   // FileSystemDirectoryHandle — set only after connectFolder()
+  _fileHandle: null,   // FileSystemFileHandle     — db.json, set only after connectFolder()
+
+  /* ------------------------------------------------------------------ */
+  /* PUBLIC: called once on page load.                                   */
+  /* Cleans up any previously stored handles (from the old caching       */
+  /* implementation) and signals that folder selection is always needed. */
+  /* ------------------------------------------------------------------ */
+  init() {
+    // Proactively delete the legacy IndexedDB handle store so that old
+    // cached paths from a previous installation never interfere.
+    try { indexedDB.deleteDatabase('MM_handles_v1'); } catch (_) {}
+    // No auto-connect: the user must always select the current folder.
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* PUBLIC: called after a user gesture (button click).                 */
+  /* Opens a directory picker — user must select the folder containing   */
+  /* index.html. Then reads db.json from that folder (creates if absent).*/
+  /* ------------------------------------------------------------------ */
+  async connectFolder() {
+    this._dirHandle  = await window.showDirectoryPicker({ mode: 'readwrite' });
+    this._fileHandle = await this._dirHandle.getFileHandle('db.json', { create: true });
+    await this._loadFromFile();
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* INTERNAL: read db.json into _data                                   */
+  /* ------------------------------------------------------------------ */
+  async _loadFromFile() {
+    const file = await this._fileHandle.getFile();
+    const text = (await file.text()).trim();
+    if (!text) return;
     try {
-      const path = window.location.pathname;
-      const dir = path.substring(0, path.lastIndexOf('/') + 1);
-      let h = 0;
-      for (let i = 0; i < dir.length; i++) {
-        h = Math.imul(31, h) + dir.charCodeAt(i) | 0;
-      }
-      return 'MM_' + Math.abs(h).toString(36);
-    } catch(e) {
-      return 'MeetingMinutesDB';
+      const p = JSON.parse(text);
+      if (p.settings)   this._data.settings  = p.settings;
+      if (p.attendees)  this._data.attendees = p.attendees;
+      if (p.meetings)   this._data.meetings  = p.meetings;
+      if ('draft' in p) this._data.draft     = p.draft;
+    } catch (e) {
+      console.warn('db.json parse error — starting with empty data:', e);
     }
-  })(),
-  DB_VERSION: 2,
-
-  _req(request) {
-    return new Promise((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result);
-      request.onerror  = () => reject(request.error);
-    });
   },
 
-  async init() {
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(this.DB_NAME, this.DB_VERSION);
-
-      req.onupgradeneeded = e => {
-        const db = e.target.result;
-        // v1 stores (kept for backward compatibility)
-        if (!db.objectStoreNames.contains('meetings')) {
-          const s = db.createObjectStore('meetings', { keyPath: 'id' });
-          s.createIndex('finalizedAt', 'finalizedAt', { unique: false });
-          s.createIndex('date', 'date', { unique: false });
-        }
-        if (!db.objectStoreNames.contains('draft')) {
-          db.createObjectStore('draft', { keyPath: 'id' });
-        }
-        // v2 stores (new)
-        if (!db.objectStoreNames.contains('settings')) {
-          db.createObjectStore('settings', { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains('attendees')) {
-          db.createObjectStore('attendees', { keyPath: 'id' });
-        }
-      };
-
-      req.onsuccess = () => { this.db = req.result; resolve(); };
-      req.onerror   = () => reject(req.error);
-    });
+  /* ------------------------------------------------------------------ */
+  /* INTERNAL: write _data back to db.json                               */
+  /* ------------------------------------------------------------------ */
+  async _save() {
+    if (!this._fileHandle) throw new Error('No folder connected — call connectFolder() first.');
+    const writable = await this._fileHandle.createWritable();
+    await writable.write(JSON.stringify(this._data, null, 2));
+    await writable.close();
   },
 
-  // ---- Draft (auto-saved while editing) ----
-
-  saveDraft(meeting) {
-    const tx = this.db.transaction('draft', 'readwrite');
-    return this._req(tx.objectStore('draft').put({ ...meeting, id: 'current' }));
+  /* ------------------------------------------------------------------ */
+  /* DRAFT (auto-saved while editing)                                    */
+  /* ------------------------------------------------------------------ */
+  async saveDraft(meeting) {
+    this._data.draft = { ...meeting, id: 'current' };
+    await this._save();
   },
 
-  loadDraft() {
-    const tx = this.db.transaction('draft', 'readonly');
-    return this._req(tx.objectStore('draft').get('current'));
+  loadDraft() { return Promise.resolve(this._data.draft || null); },
+
+  async clearDraft() {
+    this._data.draft = null;
+    await this._save();
   },
 
-  clearDraft() {
-    const tx = this.db.transaction('draft', 'readwrite');
-    return this._req(tx.objectStore('draft').delete('current'));
-  },
-
-  // ---- History (finalized meetings only) ----
-
-  saveMeeting(meeting) {
-    const tx = this.db.transaction('meetings', 'readwrite');
-    return this._req(tx.objectStore('meetings').put(meeting));
+  /* ------------------------------------------------------------------ */
+  /* MEETINGS (finalized history)                                        */
+  /* ------------------------------------------------------------------ */
+  async saveMeeting(meeting) {
+    const i = this._data.meetings.findIndex(m => m.id === meeting.id);
+    if (i >= 0) this._data.meetings[i] = meeting;
+    else        this._data.meetings.push(meeting);
+    await this._save();
   },
 
   getMeeting(id) {
-    const tx = this.db.transaction('meetings', 'readonly');
-    return this._req(tx.objectStore('meetings').get(id));
+    return Promise.resolve(this._data.meetings.find(m => m.id === id) || null);
   },
 
   getAllMeetings() {
-    return new Promise((resolve, reject) => {
-      const tx  = this.db.transaction('meetings', 'readonly');
-      const req = tx.objectStore('meetings').getAll();
-      req.onsuccess = () => {
-        const list = req.result || [];
-        list.sort((a, b) => (b.finalizedAt || 0) - (a.finalizedAt || 0));
-        resolve(list);
-      };
-      req.onerror = () => reject(req.error);
-    });
+    const list = [...this._data.meetings].sort((a, b) => (b.finalizedAt || 0) - (a.finalizedAt || 0));
+    return Promise.resolve(list);
   },
 
-  deleteMeeting(id) {
-    const tx = this.db.transaction('meetings', 'readwrite');
-    return this._req(tx.objectStore('meetings').delete(id));
+  async deleteMeeting(id) {
+    this._data.meetings = this._data.meetings.filter(m => m.id !== id);
+    await this._save();
   },
 
-  // ---- Settings (dateMode, logoDataUrl) ----
-
+  /* ------------------------------------------------------------------ */
+  /* SETTINGS                                                            */
+  /* ------------------------------------------------------------------ */
   async saveSettings(settings) {
-    const tx = this.db.transaction('settings', 'readwrite');
-    return this._req(tx.objectStore('settings').put({ ...settings, id: 'app' }));
+    this._data.settings = { ...settings, id: 'app' };
+    await this._save();
   },
 
-  async loadSettings() {
-    const tx = this.db.transaction('settings', 'readonly');
-    const result = await this._req(tx.objectStore('settings').get('app'));
-    return result || { id: 'app', dateMode: 'exact', logoDataUrl: null, pdfAccentColor: '#4b5563', pdfBgColor: '#f3f4f6' };
+  loadSettings() {
+    return Promise.resolve(
+      this._data.settings ||
+      { id: 'app', dateMode: 'exact', logoDataUrl: null, pdfAccentColor: '#4b5563', pdfBgColor: '#f3f4f6' }
+    );
   },
 
-  // ---- Attendees Master List ----
-
+  /* ------------------------------------------------------------------ */
+  /* ATTENDEES MASTER LIST                                               */
+  /* ------------------------------------------------------------------ */
   async saveAttendees(list) {
-    const tx = this.db.transaction('attendees', 'readwrite');
-    return this._req(tx.objectStore('attendees').put({ id: 'master', list }));
+    this._data.attendees = list;
+    await this._save();
   },
 
-  async loadAttendees() {
-    const tx = this.db.transaction('attendees', 'readonly');
-    const result = await this._req(tx.objectStore('attendees').get('master'));
-    return (result && Array.isArray(result.list)) ? result.list : [];
+  loadAttendees() {
+    return Promise.resolve(Array.isArray(this._data.attendees) ? this._data.attendees : []);
   }
 };

@@ -8,6 +8,7 @@
   <script src="storage.js"></script>
   <script>
     window._STORAGE_OK = (typeof Storage !== 'undefined' && typeof Storage.init === 'function');
+    window._FSA_OK     = ('showDirectoryPicker' in window);
   </script>
   <style>
     /* ===== RESET + BASE ===== */
@@ -425,6 +426,31 @@
       .attendees-checklist { grid-template-columns: 1fr 1fr; }
       .nav-tab { padding: 6px 10px; font-size: 13px; }
     }
+
+    /* ===== FOLDER SETUP OVERLAY ===== */
+    .folder-setup-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(17,24,39,0.45);
+      display: none; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .folder-setup-overlay.visible { display: flex; }
+    .folder-setup-card {
+      background: #fff; border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      max-width: 380px; width: 100%;
+      padding: 32px 28px; text-align: center;
+    }
+    .folder-setup-icon { font-size: 40px; margin-bottom: 14px; }
+    .folder-setup-desc {
+      font-size: 14px; color: var(--gray-600); line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    .folder-setup-desc code {
+      background: var(--gray-100); padding: 1px 5px;
+      border-radius: 4px; font-family: monospace; font-size: 12px;
+    }
+    .folder-setup-card .btn { width: 100%; justify-content: center; padding: 11px 20px; font-size: 15px; }
   </style>
 </head>
 <body>
@@ -765,6 +791,15 @@
   <div id="loading-overlay" class="loading-overlay">
     <div class="spinner"></div>
     <span>Processing&#x2026;</span>
+  </div>
+
+  <!-- ===== FOLDER SETUP OVERLAY ===== -->
+  <div id="folder-setup-overlay" class="folder-setup-overlay">
+    <div class="folder-setup-card">
+      <div class="folder-setup-icon">&#x1F4C1;</div>
+      <p class="folder-setup-desc" id="setup-desc"></p>
+      <button id="setup-btn" class="btn btn-primary" onclick="StorageSetup.action()"></button>
+    </div>
   </div>
 
   <script>
@@ -1145,7 +1180,7 @@
         await html2pdf().set({
           margin: 0,
           filename: `meeting-minutes-${meeting.date || 'draft'}.pdf`,
-          html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: bg, letterRendering: true },
+          html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: bg },
           jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4', compress: true }
         }).from(content).save();
       } finally {
@@ -1484,72 +1519,97 @@
   };
 
   /* ======================================================================
+     STORAGE SETUP — handles the folder-picker flow on first/each load
+     ====================================================================== */
+  const StorageSetup = {
+    show() {
+      document.getElementById('setup-desc').innerHTML =
+        'Select the folder that contains this file.<br>Your data will be read from <code>db.json</code> inside it.';
+      document.getElementById('setup-btn').textContent = 'Open folder';
+      document.getElementById('folder-setup-overlay').classList.add('visible');
+    },
+
+    hide() {
+      document.getElementById('folder-setup-overlay').classList.remove('visible');
+    },
+
+    async action() {
+      try {
+        await Storage.connectFolder();
+        this.hide();
+        await App._afterStorageReady();
+      } catch (e) {
+        if (e.name === 'AbortError') return;
+        UI.showToast('Could not open folder: ' + e.message, 'error');
+      }
+    }
+  };
+
+  /* ======================================================================
      APP — Controller / event orchestration
      ====================================================================== */
   const App = {
     saveTimeout: null,
 
-    async init() {
-      try {
-        await Storage.init();
-        State.settings        = await Storage.loadSettings();
-        State.masterAttendees = await Storage.loadAttendees();
-        State.meetings        = await Storage.getAllMeetings();
+    init() {
+      Storage.init();        // synchronous: cleans up legacy IDB, no auto-connect
+      StorageSetup.show();   // always prompt for the current folder
+    },
 
-        // Default opening: draft if exists, else pre-fill from latest meeting
-        const draft = await Storage.loadDraft();
-        if (draft) {
-          State.current = draft;
-        } else if (State.meetings.length > 0) {
-          State.current = State.createNewMeeting(State.meetings[0]);
-        } else {
-          State.current = State.createNewMeeting();
-        }
-        State.isDirty = false;
-        UI.render();
-        UI.renderHistory();
-        UI.renderSettings();
-        // Form input auto-save listeners
-        ['meeting-title', 'meeting-date', 'meeting-notes'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.addEventListener('input', () => App.markUnsaved());
-        });
+    async _afterStorageReady() {
+      State.settings        = await Storage.loadSettings();
+      State.masterAttendees = await Storage.loadAttendees();
+      State.meetings        = await Storage.getAllMeetings();
 
-        // Logo upload
-        const logoUpload = document.getElementById('logo-upload');
-        if (logoUpload) logoUpload.addEventListener('change', e => {
-          if (e.target.files[0]) App.saveLogo(e.target.files[0]);
-        });
-
-        // Date mode radios
-        document.querySelectorAll('input[name="dateMode"]').forEach(r => {
-          r.addEventListener('change', () => App.saveDateMode(r.value));
-        });
-
-        // PDF accent color swatches + custom picker
-        document.querySelectorAll('#pdf-accent-swatches .color-swatch').forEach(btn => {
-          btn.addEventListener('click', () => App.savePdfAccentColor(btn.dataset.color));
-        });
-        const accentPicker = document.getElementById('pdf-accent-custom');
-        if (accentPicker) accentPicker.addEventListener('change', e => App.savePdfAccentColor(e.target.value));
-
-        // PDF background color swatches + custom picker
-        document.querySelectorAll('#pdf-bg-swatches .color-swatch').forEach(btn => {
-          btn.addEventListener('click', () => App.savePdfBgColor(btn.dataset.color));
-        });
-        const bgPicker = document.getElementById('pdf-bg-custom');
-        if (bgPicker) bgPicker.addEventListener('change', e => App.savePdfBgColor(e.target.value));
-
-        // Ctrl/Cmd+S
-        document.addEventListener('keydown', e => {
-          if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); App.saveDraft(); }
-        });
-      } catch (err) {
-        console.error('App.init failed:', err);
+      // Default opening: draft if exists, else pre-fill from latest meeting
+      const draft = await Storage.loadDraft();
+      if (draft) {
+        State.current = draft;
+      } else if (State.meetings.length > 0) {
+        State.current = State.createNewMeeting(State.meetings[0]);
+      } else {
         State.current = State.createNewMeeting();
-        UI.render();
-        UI.showToast('Could not connect to local storage.', 'error');
       }
+      State.isDirty = false;
+      UI.render();
+      UI.renderHistory();
+      UI.renderSettings();
+
+      // Form input auto-save listeners
+      ['meeting-title', 'meeting-date', 'meeting-notes'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', () => App.markUnsaved());
+      });
+
+      // Logo upload
+      const logoUpload = document.getElementById('logo-upload');
+      if (logoUpload) logoUpload.addEventListener('change', e => {
+        if (e.target.files[0]) App.saveLogo(e.target.files[0]);
+      });
+
+      // Date mode radios
+      document.querySelectorAll('input[name="dateMode"]').forEach(r => {
+        r.addEventListener('change', () => App.saveDateMode(r.value));
+      });
+
+      // PDF accent color swatches + custom picker
+      document.querySelectorAll('#pdf-accent-swatches .color-swatch').forEach(btn => {
+        btn.addEventListener('click', () => App.savePdfAccentColor(btn.dataset.color));
+      });
+      const accentPicker = document.getElementById('pdf-accent-custom');
+      if (accentPicker) accentPicker.addEventListener('change', e => App.savePdfAccentColor(e.target.value));
+
+      // PDF background color swatches + custom picker
+      document.querySelectorAll('#pdf-bg-swatches .color-swatch').forEach(btn => {
+        btn.addEventListener('click', () => App.savePdfBgColor(btn.dataset.color));
+      });
+      const bgPicker = document.getElementById('pdf-bg-custom');
+      if (bgPicker) bgPicker.addEventListener('change', e => App.savePdfBgColor(e.target.value));
+
+      // Ctrl/Cmd+S
+      document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); App.saveDraft(); }
+      });
     },
 
     markUnsaved() {
@@ -1976,15 +2036,33 @@
             <div style="font-size:48px;margin-bottom:24px;">&#x26A0;&#xFE0F;</div>
             <h1 style="font-size:22px;font-weight:700;color:#111827;margin-bottom:12px;">Storage module missing</h1>
             <p style="font-size:15px;color:#6b7280;line-height:1.6;margin-bottom:24px;">
-              Please download and include <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-family:monospace;">storage.js</code>
-              to use this application. Place it in the same folder as
+              Please ensure <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-family:monospace;">storage.js</code>
+              is in the same folder as
               <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-family:monospace;">index.html</code>.
             </p>
             <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;font-size:13px;color:#9ca3af;font-family:monospace;text-align:left;line-height:1.8;">
               &#x1F4C1; your-folder/<br>
               &nbsp;&nbsp;&#x251C;&#x2500;&#x2500; index.html<br>
-              &nbsp;&nbsp;&#x2514;&#x2500;&#x2500; storage.js &nbsp;<span style="color:#dc2626;">&#x2190; missing</span>
+              &nbsp;&nbsp;&#x251C;&#x2500;&#x2500; storage.js &nbsp;<span style="color:#dc2626;">&#x2190; missing</span><br>
+              &nbsp;&nbsp;&#x2514;&#x2500;&#x2500; db.json
             </div>
+          </div>
+        </div>`;
+      return;
+    }
+    if (!window._FSA_OK) {
+      document.body.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f9fafb;padding:24px;font-family:system-ui,sans-serif;text-align:center;">
+          <div style="max-width:520px;">
+            <div style="font-size:48px;margin-bottom:24px;">&#x1F6AB;</div>
+            <h1 style="font-size:22px;font-weight:700;color:#111827;margin-bottom:12px;">Browser not supported</h1>
+            <p style="font-size:15px;color:#6b7280;line-height:1.6;margin-bottom:16px;">
+              This app uses the <strong>File System Access API</strong> to store data directly
+              in your project folder, making it fully portable.
+            </p>
+            <p style="font-size:15px;color:#6b7280;line-height:1.6;">
+              Please open this file in <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> (version 86 or later).
+            </p>
           </div>
         </div>`;
       return;

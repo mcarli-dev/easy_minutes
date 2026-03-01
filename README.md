@@ -24,6 +24,7 @@ Easy Minutes follows a strict separation principle:
 
 * `index.html` → UI shell only
 * `storage.js` → All persistence logic
+* `db.json` → Data storage
 
 ### 🔐 Core Rules
 

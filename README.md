@@ -46,5 +46,5 @@ Open index.html in Chrome or Edge, select your working folder, then choose or cr
 │
 ├── index.html
 ├── storage.js
-└── your-database.js
+└── your-database.json
 ```

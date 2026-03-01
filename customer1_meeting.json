@@ -1,0 +1,47 @@
+{
+  "settings": {
+    "id": "app",
+    "dateMode": "exact",
+    "logoDataUrl": null,
+    "pdfAccentColor": "#5e4b63",
+    "pdfBgColor": "#f3f4f6"
+  },
+  "attendees": [
+    {
+      "id": "e74e142c-0d53-475b-961c-a480edcd7c7b",
+      "name": "Rick",
+      "surname": "Sanchez",
+      "company": ""
+    },
+    {
+      "id": "c2bf1d80-cbe3-4153-8bc1-2c49fe8ee172",
+      "name": "Morty",
+      "surname": "Smith",
+      "company": ""
+    }
+  ],
+  "meetings": [
+    {
+      "id": "current",
+      "title": "Customer 1",
+      "date": "2026-03-01",
+      "attendeeIds": [],
+      "notes": "",
+      "agendaPoints": [],
+      "createdAt": 1772331582769,
+      "finalizedAt": 1772332139166,
+      "previousMeetingId": "9575a1f2-8767-4cc3-bc91-13312ccd19a4"
+    }
+  ],
+  "draft": {
+    "id": "current",
+    "title": "Customer 1",
+    "date": "2026-03-01",
+    "attendeeIds": [],
+    "notes": "",
+    "agendaPoints": [],
+    "createdAt": 1772332139189,
+    "finalizedAt": null,
+    "previousMeetingId": "current"
+  }
+}

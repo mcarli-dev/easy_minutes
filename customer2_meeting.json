@@ -1,0 +1,25 @@
+{
+  "settings": {
+    "id": "app",
+    "dateMode": "cw",
+    "logoDataUrl": null,
+    "pdfAccentColor": "#4b5563",
+    "pdfBgColor": "#f3f4f6"
+  },
+  "attendees": [],
+  "meetings": [],
+  "draft": {
+    "id": "current",
+    "title": "",
+    "date": "2026-03-01",
+    "attendeeIds": [
+      "369c57df-672e-4de0-8d7d-ffac8fd4bc75",
+      "94e493a0-3646-4de9-b2a2-c593e3c78517"
+    ],
+    "notes": "",
+    "agendaPoints": [],
+    "createdAt": 1772331713893,
+    "finalizedAt": null,
+    "previousMeetingId": "current"
+  }
+}

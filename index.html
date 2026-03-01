@@ -450,7 +450,20 @@
       background: var(--gray-100); padding: 1px 5px;
       border-radius: 4px; font-family: monospace; font-size: 12px;
     }
-    .folder-setup-card .btn { width: 100%; justify-content: center; padding: 11px 20px; font-size: 15px; }
+    #setup-step-1 .btn { width: 100%; justify-content: center; padding: 11px 20px; font-size: 15px; }
+    .setup-back-row { display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+    .setup-back-btn { background:none; border:none; cursor:pointer; font-size:13px; color:var(--primary); padding:0; flex-shrink:0; }
+    .setup-back-btn:hover { text-decoration:underline; }
+    .setup-folder-crumb { font-size:12px; color:var(--gray-400); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .setup-file-list { display:flex; flex-direction:column; gap:6px; max-height:210px; overflow-y:auto; margin-bottom:14px; }
+    .setup-file-btn { display:flex; align-items:center; gap:8px; width:100%; padding:9px 12px; background:var(--gray-50); border:1px solid var(--gray-200); border-radius:var(--radius); font-size:14px; color:var(--gray-800); cursor:pointer; transition:all 0.15s ease; text-align:left; font-family:monospace; }
+    .setup-file-btn:hover { background:var(--primary-light); border-color:var(--primary); color:var(--primary); }
+    .setup-no-files { font-size:13px; color:var(--gray-400); text-align:center; padding:14px 0; font-style:italic; }
+    .setup-new-row { display:flex; align-items:center; gap:6px; border-top:1px solid var(--gray-200); padding-top:12px; }
+    .setup-new-input { flex:1; min-width:0; padding:7px 10px; border:1px solid var(--gray-300); border-radius:var(--radius); font-size:13px; font-family:monospace; }
+    .setup-new-input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 2px var(--primary-light); }
+    .setup-new-ext { font-size:12px; color:var(--gray-500); font-family:monospace; flex-shrink:0; }
+    #header-file { font-size:12px; color:var(--gray-500); font-family:monospace; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:none; }
   </style>
 </head>
 <body>
@@ -468,6 +481,7 @@
       <button class="nav-tab" data-view="settings">Settings</button>
     </nav>
     <div class="header-actions">
+      <span id="header-file"></span>
       <div id="status-dot"></div>
       <span id="status-text">Ready</span>
     </div>
@@ -796,9 +810,34 @@
   <!-- ===== FOLDER SETUP OVERLAY ===== -->
   <div id="folder-setup-overlay" class="folder-setup-overlay">
     <div class="folder-setup-card">
-      <div class="folder-setup-icon">&#x1F4C1;</div>
-      <p class="folder-setup-desc" id="setup-desc"></p>
-      <button id="setup-btn" class="btn btn-primary" onclick="StorageSetup.action()"></button>
+
+      <!-- Step 1: pick folder -->
+      <div id="setup-step-1">
+        <div class="folder-setup-icon">&#x1F4C1;</div>
+        <p class="folder-setup-desc">
+          Open the folder that contains your meeting files.<br>
+          You will choose which database to open in the next step.
+        </p>
+        <button class="btn btn-primary" onclick="StorageSetup.pickFolder()">Open folder</button>
+      </div>
+
+      <!-- Step 2: pick or create a JSON file -->
+      <div id="setup-step-2" style="display:none">
+        <div class="setup-back-row">
+          <button class="setup-back-btn" onclick="StorageSetup.backToFolder()">&#x2190; Back</button>
+          <span class="setup-folder-crumb" id="setup-folder-crumb"></span>
+        </div>
+        <p class="folder-setup-desc" style="margin-bottom:10px">Select a database file:</p>
+        <div id="setup-file-list" class="setup-file-list"></div>
+        <div class="setup-new-row">
+          <input type="text" id="setup-new-filename" class="setup-new-input"
+                 placeholder="new-database-name"
+                 onkeydown="if(event.key==='Enter')StorageSetup.createNew()">
+          <span class="setup-new-ext">.json</span>
+          <button class="btn btn-secondary btn-sm" onclick="StorageSetup.createNew()">+ New</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1522,10 +1561,10 @@
      STORAGE SETUP — handles the folder-picker flow on first/each load
      ====================================================================== */
   const StorageSetup = {
+    /* Show step 1 (folder picker) */
     show() {
-      document.getElementById('setup-desc').innerHTML =
-        'Select your working folder.<br>Your data will be read from <code>db.json</code> inside it.';
-      document.getElementById('setup-btn').textContent = 'Open folder';
+      document.getElementById('setup-step-1').style.display = '';
+      document.getElementById('setup-step-2').style.display = 'none';
       document.getElementById('folder-setup-overlay').classList.add('visible');
     },
 
@@ -1533,15 +1572,68 @@
       document.getElementById('folder-setup-overlay').classList.remove('visible');
     },
 
-    async action() {
+    /* Called by "Open folder" button */
+    async pickFolder() {
       try {
         await Storage.connectFolder();
-        this.hide();
-        await App._afterStorageReady();
+        await this._showFileStep();
       } catch (e) {
         if (e.name === 'AbortError') return;
         UI.showToast('Could not open folder: ' + e.message, 'error');
       }
+    },
+
+    /* Populate and show step 2 */
+    async _showFileStep() {
+      const files = await Storage.listJsonFiles();
+
+      document.getElementById('setup-folder-crumb').textContent = Storage._dirHandle.name;
+
+      const list = document.getElementById('setup-file-list');
+      list.innerHTML = '';
+
+      if (files.length === 0) {
+        list.innerHTML = '<div class="setup-no-files">No .json files found — create one below.</div>';
+      } else {
+        files.forEach(name => {
+          const btn = document.createElement('button');
+          btn.className = 'setup-file-btn';
+          btn.innerHTML = '&#x1F4C4; ' + Utils.escapeHtml(name);
+          btn.onclick = () => this.openFile(name);
+          list.appendChild(btn);
+        });
+      }
+
+      document.getElementById('setup-new-filename').value = '';
+      document.getElementById('setup-step-1').style.display = 'none';
+      document.getElementById('setup-step-2').style.display = '';
+    },
+
+    /* "← Back" button */
+    backToFolder() {
+      document.getElementById('setup-step-1').style.display = '';
+      document.getElementById('setup-step-2').style.display = 'none';
+    },
+
+    /* Open an existing file from the list */
+    async openFile(name) {
+      try {
+        await Storage.openFile(name);
+        this.hide();
+        await App._afterStorageReady();
+      } catch (e) {
+        UI.showToast('Could not open ' + name + ': ' + e.message, 'error');
+      }
+    },
+
+    /* "+ New" button */
+    async createNew() {
+      const input = document.getElementById('setup-new-filename');
+      const raw   = (input.value || '').trim();
+      if (!raw) { input.focus(); return; }
+      // Strip illegal filesystem characters; strip any trailing .json the user typed
+      const safe = raw.replace(/[/\\:*?"<>|]/g, '-').replace(/\.json$/i, '');
+      await this.openFile(safe + '.json');
     }
   };
 
@@ -1557,6 +1649,11 @@
     },
 
     async _afterStorageReady() {
+      // Show active filename in header and browser tab
+      const fileEl = document.getElementById('header-file');
+      if (fileEl) { fileEl.textContent = Storage.activeFile; fileEl.style.display = ''; }
+      document.title = Storage.activeFile + ' — Meeting Minutes';
+
       State.settings        = await Storage.loadSettings();
       State.masterAttendees = await Storage.loadAttendees();
       State.meetings        = await Storage.getAllMeetings();
@@ -2044,7 +2141,7 @@
               &#x1F4C1; your-folder/<br>
               &nbsp;&nbsp;&#x251C;&#x2500;&#x2500; index.html<br>
               &nbsp;&nbsp;&#x251C;&#x2500;&#x2500; storage.js &nbsp;<span style="color:#dc2626;">&#x2190; missing</span><br>
-              &nbsp;&nbsp;&#x2514;&#x2500;&#x2500; db.json
+              &nbsp;&nbsp;&#x2514;&#x2500;&#x2500; your-database.json
             </div>
           </div>
         </div>`;

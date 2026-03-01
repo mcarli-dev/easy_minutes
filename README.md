@@ -2,12 +2,8 @@
 
 **Easy Minutes** is a portable meeting minutes application.
 
-It is designed to be:
-
 * 🚀 Portable
 * 📂 Easy to duplicate per project or supplier
-* 🔒 Storage-isolated
-* 🧼 Cache-safe
 * ⚡ Lightweight (no build required)
 
 ## 📸 Screenshot
@@ -18,54 +14,12 @@ It is designed to be:
 
 ---
 
-## 🏗 Architecture
-
-Easy Minutes follows a strict separation principle:
-
-* `index.html` → UI shell only
-* `storage.js` → All persistence logic
-* `db.json` → Data storage
-
-### 🔐 Core Rules
-
-* No business data is embedded in `index.html`
-* No default attendees, history, or settings are hardcoded
-* No fallback persistence exists inside `index.html`
-* If `storage.js` is missing, the app will not boot
-
----
-
-## ✨ Features
-
-### 📅 Meeting Management
-
-* Auto-save draft
-* Finalize to create history entry
-* Load previous meetings
-* Delete history entries
-* Preview before finalizing
-
-### 📌 Agenda Points
-
-Each agenda point includes:
-
-* Title
-* Description
-* Assignee (from master attendee list)
-* Deadline
-* Status (Open, Resolved, Blocked)
-* Automatic countdown (days or calendar weeks)
-* Overdue visual indicator
-
----
-
-### 👥 Attendees Management
-
-Central master list in Settings:
-
-* Name
-* Surname
-* Company
+### ✨ Features
+* Create and edit meeting minutes with agenda points, attendees, deadlines, and status tracking
+* Finalize meetings to history and carry open items forward to the next session
+* Export to PDF with customizable accent and background colors
+* Manage a master attendee list reusable across meetings
+* Support for multiple independent databases in the same folder (e.g. supplier1.json, internal.json)
 
 ---
 
@@ -73,113 +27,24 @@ Central master list in Settings:
 
 * Logo upload (JPEG / PNG)
 * Date mode selection (calendar weeks or exact dates)
-* Persistent configuration via `storage.js`
 
 ---
 
-### 📄 Export
+### 📖 How to Use
 
-* PDF export available only from History
-* Includes:
-
-  * Logo
-  * Attendees
-  * Agenda points
-  * Status
-  * Deadlines
+Open index.html in Chrome or Edge, select your working folder, then choose or create a .json database file. From that point, all reads and writes go to that file only. No browser cache, no hidden state, no cross-session references.
 
 ---
 
-### ✅ Guarantees
+### 📁 Project Structure
 
-* No data carryover
-* No browser cache contamination
-* No need to clear browser storage
-* No cross-folder leakage
-* Same browser can be reused safely
-
----
-
-## 🚀 Installation
-
-No build system required.
-
-1. Download `index.html`
-2. Download `storage.js`
-3. Download `db.json`
-4. Place both files in the same folder
-5. Open `index.html` in your browser
-6. Select working folder
-
----
-
-## 🔄 Boot Behavior
-
-If `storage.js` is missing:
-
-* The app displays a schematic message
-* All functionality is disabled
-* No data is shown
-
-This prevents accidental data leakage and enforces isolation.
-
----
-
-## 📖 How to Use
-
-### 1️⃣ Settings
-
-Open Settings:
-
-* Add attendees
-* Upload logo
-* Choose date mode
-
-All changes persist via `storage.js`.
-
----
-
-### 2️⃣ Creating a Meeting
-
-* Select attendees
-* Add agenda points
-* Assign owners
-* Set deadlines
-* Set status
-
-Draft is saved automatically.
-
----
-
-### 3️⃣ Finalize
-
-Click **Finalize**:
-
-* Creates history entry
-* Clears draft
-* Prepares next meeting
-
-Draft is not stored in history until finalized.
-
----
-
-### 4️⃣ History
-
-From History you can:
-
-* Preview meetings
-* Export PDF
-* Delete entries
-* Load previous meeting
-
----
-
-## 📁 Project Structure
+* Google Chrome or Microsoft Edge (version 86+)
+* No installation, no build step, no dependencies beyond the three files in the folder
 
 ```
 /project-folder
 │
 ├── index.html
-├── db.json
-└── storage.js
+├── storage.js
+└── your-database.js
 ```

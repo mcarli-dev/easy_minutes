@@ -3,13 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Local Meeting Minutes</title>
+  <title>Meeting Minutes</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  <script src="storage.js"></script>
-  <script>
-    window._STORAGE_OK = (typeof Storage !== 'undefined' && typeof Storage.init === 'function');
-    window._FSA_OK     = ('showDirectoryPicker' in window);
-  </script>
   <style>
     /* ===== RESET + BASE ===== */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -185,10 +180,23 @@
     .agenda-point-item:hover { box-shadow: var(--shadow-md); border-color: var(--gray-300); }
     .agenda-point-item.status-resolved { opacity: 0.65; }
     .agenda-point-item.status-blocked { border-left: 4px solid var(--danger); }
+    .agenda-point-item.dragging { opacity: 0.35; }
+    .agenda-point-item.drag-over { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-light); }
     .agenda-point-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
+    .drag-handle {
+      cursor: grab; color: var(--gray-300); font-size: 15px;
+      padding: 1px 2px; user-select: none; flex-shrink: 0; line-height: 1;
+      border-radius: 4px; transition: color 0.15s, background 0.15s;
+      margin-top: 1px;
+    }
+    .drag-handle:hover { color: var(--gray-500); background: var(--gray-100); }
+    .drag-handle:active { cursor: grabbing; }
     .agenda-point-title { font-size: 15px; font-weight: 600; color: var(--gray-900); flex: 1; line-height: 1.4; }
     .agenda-point-title.resolved-title { text-decoration: line-through; color: var(--gray-400); }
-    .agenda-point-description { font-size: 13px; color: var(--gray-600); margin-bottom: 10px; line-height: 1.6; }
+    .agenda-point-description {
+      font-size: 13px; color: var(--gray-600); margin-bottom: 10px;
+      line-height: 1.6; white-space: pre-wrap;
+    }
     .agenda-point-meta {
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
       margin-top: 8px;
@@ -226,6 +234,10 @@
     .badge-resolved    { background: var(--success-light); color: var(--success); }
     .badge-blocked     { background: var(--danger-light); color: var(--danger); }
     .badge-carried     { background: var(--warning-light); color: var(--warning); }
+    .badge-priority-low      { background: var(--gray-100);      color: var(--gray-500); }
+    .badge-priority-medium   { background: var(--primary-light);  color: var(--primary); }
+    .badge-priority-high     { background: var(--warning-light);  color: var(--warning); }
+    .badge-priority-critical { background: var(--danger-light);   color: var(--danger); font-weight: 700; }
 
     /* ===== INLINE STATUS SELECT ===== */
     .status-select-inline {
@@ -291,13 +303,11 @@
       border: 1px solid var(--gray-300); border-radius: var(--radius); background: #fff;
     }
 
-    /* ===== ADD ITEM FIELDS ===== */
-    .add-item-fields {
-      display: none; flex-direction: column; gap: 10px;
-      padding: 16px 20px; border-top: 1px solid var(--gray-100); background: var(--gray-50);
-    }
-    .add-item-fields.visible { display: flex; }
-    .add-item-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    /* ===== DANGER ZONE ===== */
+    .card.danger-zone { border: 1px solid var(--danger-light); }
+    .card.danger-zone .card-header { background: #fff5f5; border-bottom-color: var(--danger-light); }
+    .card.danger-zone .card-header h2 { color: var(--danger); }
+    .danger-zone-desc { font-size: 14px; color: var(--gray-600); margin-bottom: 16px; line-height: 1.6; }
 
     /* ===== EMPTY STATE ===== */
     .empty-state {
@@ -355,6 +365,11 @@
     .modal-body .form-group:last-child { margin-bottom: 0; }
     #finalize-summary { font-size: 14px; line-height: 1.7; }
     #finalize-summary p { margin-bottom: 6px; }
+
+    /* ===== CLEAR ALL MODAL ===== */
+    .clear-confirm-box { margin-top: 14px; }
+    .clear-confirm-box p { font-size: 14px; color: var(--gray-700); margin-bottom: 8px; }
+    .clear-confirm-box strong { color: var(--danger); }
 
     /* ===== TOAST ===== */
     .toast-container { position: fixed; bottom: 80px; right: 24px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
@@ -426,44 +441,6 @@
       .attendees-checklist { grid-template-columns: 1fr 1fr; }
       .nav-tab { padding: 6px 10px; font-size: 13px; }
     }
-
-    /* ===== FOLDER SETUP OVERLAY ===== */
-    .folder-setup-overlay {
-      position: fixed; inset: 0; z-index: 200;
-      background: rgba(17,24,39,0.45);
-      display: none; align-items: center; justify-content: center;
-      padding: 24px;
-    }
-    .folder-setup-overlay.visible { display: flex; }
-    .folder-setup-card {
-      background: #fff; border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-lg);
-      max-width: 380px; width: 100%;
-      padding: 32px 28px; text-align: center;
-    }
-    .folder-setup-icon { font-size: 40px; margin-bottom: 14px; }
-    .folder-setup-desc {
-      font-size: 14px; color: var(--gray-600); line-height: 1.6;
-      margin-bottom: 20px;
-    }
-    .folder-setup-desc code {
-      background: var(--gray-100); padding: 1px 5px;
-      border-radius: 4px; font-family: monospace; font-size: 12px;
-    }
-    #setup-step-1 .btn { width: 100%; justify-content: center; padding: 11px 20px; font-size: 15px; }
-    .setup-back-row { display:flex; align-items:center; gap:8px; margin-bottom:14px; }
-    .setup-back-btn { background:none; border:none; cursor:pointer; font-size:13px; color:var(--primary); padding:0; flex-shrink:0; }
-    .setup-back-btn:hover { text-decoration:underline; }
-    .setup-folder-crumb { font-size:12px; color:var(--gray-400); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .setup-file-list { display:flex; flex-direction:column; gap:6px; max-height:210px; overflow-y:auto; margin-bottom:14px; }
-    .setup-file-btn { display:flex; align-items:center; gap:8px; width:100%; padding:9px 12px; background:var(--gray-50); border:1px solid var(--gray-200); border-radius:var(--radius); font-size:14px; color:var(--gray-800); cursor:pointer; transition:all 0.15s ease; text-align:left; font-family:monospace; }
-    .setup-file-btn:hover { background:var(--primary-light); border-color:var(--primary); color:var(--primary); }
-    .setup-no-files { font-size:13px; color:var(--gray-400); text-align:center; padding:14px 0; font-style:italic; }
-    .setup-new-row { display:flex; align-items:center; gap:6px; border-top:1px solid var(--gray-200); padding-top:12px; }
-    .setup-new-input { flex:1; min-width:0; padding:7px 10px; border:1px solid var(--gray-300); border-radius:var(--radius); font-size:13px; font-family:monospace; }
-    .setup-new-input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 2px var(--primary-light); }
-    .setup-new-ext { font-size:12px; color:var(--gray-500); font-family:monospace; flex-shrink:0; }
-    #header-file { font-size:12px; color:var(--gray-500); font-family:monospace; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:none; }
   </style>
 </head>
 <body>
@@ -481,7 +458,6 @@
       <button class="nav-tab" data-view="settings">Settings</button>
     </nav>
     <div class="header-actions">
-      <span id="header-file"></span>
       <div id="status-dot"></div>
       <span id="status-text">Ready</span>
     </div>
@@ -524,7 +500,7 @@
         </div>
       </div>
 
-      <!-- Agenda Points (renamed from Action Items, new structure) -->
+      <!-- Agenda Points -->
       <div class="card">
         <div class="card-header">
           <h2>&#x1F3AF; Agenda Points <span id="agenda-count" class="badge badge-open" style="margin-left:6px;">0</span></h2>
@@ -674,6 +650,20 @@
         </div>
       </div>
 
+      <!-- Danger Zone -->
+      <div class="card danger-zone">
+        <div class="card-header">
+          <h2>&#x26A0;&#xFE0F; Danger Zone</h2>
+        </div>
+        <div class="card-body">
+          <p class="danger-zone-desc">
+            Permanently wipe all meetings, attendees, settings, and the current draft from this file's storage.
+            Use this to reset the app when reusing this HTML file for a new client.
+          </p>
+          <button class="btn btn-danger" onclick="App.openClearAll()">&#x1F5D1; Clear All Data</button>
+        </div>
+      </div>
+
     </div><!-- /view-settings -->
 
   </main>
@@ -710,7 +700,7 @@
         </div>
         <div class="form-group">
           <label>Description</label>
-          <textarea id="agenda-description-input" rows="3" placeholder="Detailed description (optional)..."></textarea>
+          <textarea id="agenda-description-input" rows="4" placeholder="Detailed description (optional). Supports multiple lines."></textarea>
         </div>
         <div class="form-grid">
           <div class="form-group">
@@ -723,12 +713,21 @@
             <label>Deadline</label>
             <input type="date" id="agenda-deadline-input">
           </div>
-          <div class="form-group full-width">
+          <div class="form-group">
             <label>Status</label>
             <select id="agenda-status-input">
               <option value="open">Open</option>
               <option value="resolved">Resolved</option>
               <option value="blocked">Blocked</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Priority</label>
+            <select id="agenda-priority-input">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
             </select>
           </div>
         </div>
@@ -788,6 +787,28 @@
     </div>
   </div>
 
+  <!-- ===== CLEAR ALL MODAL ===== -->
+  <div id="clear-all-modal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header" style="color:var(--danger);">&#x26A0;&#xFE0F; Clear All Data</div>
+      <div class="modal-body">
+        <p style="font-size:14px;color:var(--gray-700);line-height:1.6;">
+          This will permanently delete <strong>all meetings, history, attendees, settings, and the current draft</strong>.
+          This action cannot be undone.
+        </p>
+        <div class="clear-confirm-box">
+          <p>Type <strong>clear</strong> and press Enter to confirm:</p>
+          <input type="text" id="clear-confirm-input" placeholder="Type 'clear' here..."
+                 onkeydown="if(event.key==='Enter')App.confirmClearAll()">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="App.closeModal('clear-all-modal')">Cancel</button>
+        <button class="btn btn-danger" onclick="App.confirmClearAll()">Wipe All Data</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== PDF PREVIEW ===== -->
   <div id="pdf-preview">
     <div class="pdf-preview-controls">
@@ -807,41 +828,125 @@
     <span>Processing&#x2026;</span>
   </div>
 
-  <!-- ===== FOLDER SETUP OVERLAY ===== -->
-  <div id="folder-setup-overlay" class="folder-setup-overlay">
-    <div class="folder-setup-card">
-
-      <!-- Step 1: pick folder -->
-      <div id="setup-step-1">
-        <div class="folder-setup-icon">&#x1F4C1;</div>
-        <p class="folder-setup-desc">
-          Open the folder that contains your meeting files.<br>
-          You will choose which database to open in the next step.
-        </p>
-        <button class="btn btn-primary" onclick="StorageSetup.pickFolder()">Open folder</button>
-      </div>
-
-      <!-- Step 2: pick or create a JSON file -->
-      <div id="setup-step-2" style="display:none">
-        <div class="setup-back-row">
-          <button class="setup-back-btn" onclick="StorageSetup.backToFolder()">&#x2190; Back</button>
-          <span class="setup-folder-crumb" id="setup-folder-crumb"></span>
-        </div>
-        <p class="folder-setup-desc" style="margin-bottom:10px">Select a database file:</p>
-        <div id="setup-file-list" class="setup-file-list"></div>
-        <div class="setup-new-row">
-          <input type="text" id="setup-new-filename" class="setup-new-input"
-                 placeholder="new-database-name"
-                 onkeydown="if(event.key==='Enter')StorageSetup.createNew()">
-          <span class="setup-new-ext">.json</span>
-          <button class="btn btn-secondary btn-sm" onclick="StorageSetup.createNew()">+ New</button>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
   <script>
+  /* ======================================================================
+     STORAGE — localStorage-based persistence (single-file, no JSON picker)
+     Key is derived from the page URL so each copy of the HTML has its own
+     isolated data store.
+     ====================================================================== */
+  const Storage = {
+    _KEY: 'mm_v2_default',
+    _data: null,
+
+    _empty() {
+      return {
+        settings:  { id: 'app', dateMode: 'exact', logoDataUrl: null,
+                     pdfAccentColor: '#4b5563', pdfBgColor: '#f3f4f6' },
+        attendees: [],
+        meetings:  [],
+        draft:     null
+      };
+    },
+
+    init() {
+      // Namespace by file URL so different HTML copies have separate data
+      try {
+        this._KEY = 'mm_v2_' + btoa(encodeURIComponent(location.href)).substring(0, 48);
+      } catch (_) {
+        this._KEY = 'mm_v2_default';
+      }
+
+      this._data = this._empty();
+      try {
+        const raw = localStorage.getItem(this._KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+        if (parsed.settings && typeof parsed.settings === 'object') {
+          this._data.settings = { ...this._data.settings, ...parsed.settings };
+        }
+        if (Array.isArray(parsed.attendees)) this._data.attendees = parsed.attendees;
+        if (Array.isArray(parsed.meetings))  this._data.meetings  = parsed.meetings;
+        if ('draft' in parsed)               this._data.draft     = parsed.draft;
+      } catch (e) {
+        console.warn('[Storage] Failed to load:', e);
+        this._data = this._empty();
+      }
+    },
+
+    _save() {
+      try {
+        localStorage.setItem(this._KEY, JSON.stringify(this._data));
+      } catch (e) {
+        console.error('[Storage] Failed to save:', e);
+        throw e;
+      }
+    },
+
+    // Draft — stored with its real UUID (not overridden to 'current')
+    saveDraft(meeting) {
+      this._data.draft = JSON.parse(JSON.stringify(meeting));
+      this._save();
+      return Promise.resolve();
+    },
+    loadDraft() {
+      return Promise.resolve(this._data.draft ? JSON.parse(JSON.stringify(this._data.draft)) : null);
+    },
+    clearDraft() {
+      this._data.draft = null;
+      this._save();
+      return Promise.resolve();
+    },
+
+    // Meetings
+    saveMeeting(meeting) {
+      const saved = JSON.parse(JSON.stringify(meeting));
+      const i = this._data.meetings.findIndex(m => m.id === saved.id);
+      if (i >= 0) this._data.meetings[i] = saved;
+      else        this._data.meetings.push(saved);
+      this._save();
+      return Promise.resolve();
+    },
+    getMeeting(id) {
+      const m = this._data.meetings.find(m => m.id === id);
+      return Promise.resolve(m ? JSON.parse(JSON.stringify(m)) : null);
+    },
+    getAllMeetings() {
+      const list = JSON.parse(JSON.stringify(this._data.meetings))
+        .sort((a, b) => (b.finalizedAt || 0) - (a.finalizedAt || 0));
+      return Promise.resolve(list);
+    },
+    deleteMeeting(id) {
+      this._data.meetings = this._data.meetings.filter(m => m.id !== id);
+      this._save();
+      return Promise.resolve();
+    },
+
+    // Settings
+    saveSettings(s) {
+      this._data.settings = { ...s, id: 'app' };
+      this._save();
+      return Promise.resolve();
+    },
+    loadSettings() { return Promise.resolve({ ...this._data.settings }); },
+
+    // Attendees
+    saveAttendees(list) {
+      this._data.attendees = JSON.parse(JSON.stringify(list));
+      this._save();
+      return Promise.resolve();
+    },
+    loadAttendees() {
+      return Promise.resolve(JSON.parse(JSON.stringify(this._data.attendees)));
+    },
+
+    // Wipe everything
+    clearAll() {
+      localStorage.removeItem(this._KEY);
+      this._data = this._empty();
+    }
+  };
+
   /* ======================================================================
      UTILS — Pure helper functions
      ====================================================================== */
@@ -883,19 +988,17 @@
       });
     },
 
-    // ISO 8601 calendar week
     getISOWeek(dateStr) {
       const d = this._parseDate(dateStr);
       if (!d) return null;
       const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-      const day = date.getUTCDay() || 7; // Mon=1 … Sun=7
+      const day = date.getUTCDay() || 7;
       date.setUTCDate(date.getUTCDate() + 4 - day);
       const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
       const week = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
       return { week, year: date.getUTCFullYear() };
     },
 
-    // Returns formatted deadline label according to dateMode
     formatDeadline(dateStr, dateMode) {
       if (!dateStr) return '';
       if (dateMode === 'cw') {
@@ -906,7 +1009,6 @@
       return this.formatDateShort(dateStr);
     },
 
-    // Returns { label, countdown, isOverdue, cssClass }
     getDeadlineInfo(dateStr, dateMode) {
       if (!dateStr) return null;
       const today = new Date(); today.setHours(0,0,0,0);
@@ -920,14 +1022,14 @@
       let countdown;
       if (dateMode === 'cw') {
         const abW = Math.abs(diffWeeks);
-        if (isOverdue)      countdown = `${abW} week${abW !== 1 ? 's' : ''} overdue`;
+        if (isOverdue)          countdown = `${abW} week${abW !== 1 ? 's' : ''} overdue`;
         else if (diffWeeks === 0) countdown = 'due this week';
-        else                countdown = `${diffWeeks} week${diffWeeks !== 1 ? 's' : ''} left`;
+        else                    countdown = `${diffWeeks} week${diffWeeks !== 1 ? 's' : ''} left`;
       } else {
         const abD = Math.abs(diffDays);
-        if (isOverdue)      countdown = `${abD} day${abD !== 1 ? 's' : ''} overdue`;
+        if (isOverdue)          countdown = `${abD} day${abD !== 1 ? 's' : ''} overdue`;
         else if (diffDays === 0) countdown = 'due today';
-        else                countdown = `${diffDays} day${diffDays !== 1 ? 's' : ''} left`;
+        else                    countdown = `${diffDays} day${diffDays !== 1 ? 's' : ''} left`;
       }
 
       let cssClass = 'on-time';
@@ -938,7 +1040,6 @@
       return { label: this.formatDeadline(dateStr, dateMode), countdown, isOverdue, cssClass };
     },
 
-    // Format attendee for display
     formatAttendee(a) {
       if (!a) return 'Unknown';
       const full = `${a.name} ${a.surname}`.trim();
@@ -949,7 +1050,7 @@
       return (list || []).find(a => a.id === id) || null;
     },
 
-    clone(obj)      { return JSON.parse(JSON.stringify(obj)); },
+    clone(obj) { return JSON.parse(JSON.stringify(obj)); },
 
     escapeHtml(str) {
       if (str == null) return '';
@@ -970,7 +1071,7 @@
     settings: { dateMode: 'exact', logoDataUrl: null, pdfAccentColor: '#4b5563', pdfBgColor: '#f3f4f6' },
     editingAgendaId: null,
     editingAttendeeId: null,
-    previewMeetingId: null, // which meeting is open in PDF preview
+    previewMeetingId: null,
 
     createNewMeeting(prev = null) {
       const m = {
@@ -985,11 +1086,9 @@
         previousMeetingId: null
       };
       if (prev) {
-        m.title            = prev.title || '';
-        m.attendeeIds      = [...(prev.attendeeIds || [])];
+        m.title             = prev.title || '';
+        m.attendeeIds       = [...(prev.attendeeIds || [])];
         m.previousMeetingId = prev.id;
-        // Carry over all agenda points, preserving their exact status.
-        // Resolved points are included but remain visually greyed out in the UI.
         (prev.agendaPoints || []).forEach(ap => {
           m.agendaPoints.push({
             id: Utils.uuid(),
@@ -998,6 +1097,7 @@
             assigneeId: ap.assigneeId || '',
             deadline: ap.deadline || ap.dueDate || '',
             status: ap.status || 'open',
+            priority: ap.priority || 'medium',
             createdAt: Date.now(),
             carriedOverFrom: prev.id
           });
@@ -1006,15 +1106,16 @@
       return m;
     },
 
-    addAgendaPoint(title, description, assigneeId, deadline, status) {
+    addAgendaPoint(title, description, assigneeId, deadline, status, priority) {
       if (!this.current) return;
       this.current.agendaPoints.push({
         id: Utils.uuid(),
         title: title.trim(),
-        description: (description || '').trim(),
+        description: description || '',
         assigneeId: assigneeId || '',
         deadline: deadline || '',
         status: status || 'open',
+        priority: priority || 'medium',
         createdAt: Date.now(),
         carriedOverFrom: null
       });
@@ -1052,7 +1153,7 @@
     computeChanges(prev, curr) {
       const changes = [];
       if (!curr) return changes;
-      const prevAP   = new Map((prev ? prev.agendaPoints || [] : []).map(p => [p.id, p]));
+      const prevAP    = new Map((prev ? prev.agendaPoints || [] : []).map(p => [p.id, p]));
       const currAPIds = new Set((curr.agendaPoints || []).map(p => p.id));
 
       (curr.agendaPoints || []).forEach(p => {
@@ -1077,7 +1178,7 @@
   };
 
   /* ======================================================================
-     PDFGEN — Report generation (includes logo, attendees, agenda points)
+     PDFGEN — Report generation
      ====================================================================== */
   const PDFGen = {
     _hexToRgb(hex) {
@@ -1089,12 +1190,44 @@
       const d = v => Math.max(0, Math.round(v * (1 - factor)));
       return '#' + [d(r), d(g), d(b)].map(v => v.toString(16).padStart(2, '0')).join('');
     },
+
     buildCSS(accentColor, bgColor) {
       const accent = accentColor || '#4b5563';
-      const bg = bgColor || '#f3f4f6';
+      const bg     = bgColor     || '#f3f4f6';
       const accentDark = this._darken(accent, 0.4);
-      const bgDarker = this._darken(bg, 0.06);
-      return `*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,Arial,sans-serif;font-size:13px;line-height:1.6;color:#222;background:${bg}}.pdf-wrap{width:794px;background:${bg}}.pdf-header{background:linear-gradient(135deg,${accentDark} 0%,${accent} 100%);padding:32px 40px 24px;margin-bottom:0}.pdf-header-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.pdf-logo img{max-height:52px;max-width:140px;object-fit:contain;filter:brightness(0) invert(1)}.pdf-org{font-size:10px;text-transform:uppercase;letter-spacing:.15em;color:rgba(255,255,255,0.75);margin-bottom:6px}.pdf-title{font-size:24px;font-weight:bold;color:#fff;margin-bottom:4px}.pdf-meta-bar{display:flex;gap:24px;flex-wrap:wrap}.pdf-meta{font-size:12px;color:rgba(255,255,255,0.80);margin-bottom:0}.pdf-body{padding:32px 40px 8px}.pdf-section{margin-bottom:28px}.pdf-section-title{font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.12em;color:${accent};margin-bottom:14px;padding-left:10px;border-left:3px solid ${accent};border-radius:2px}.pdf-item{background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:10px}.pdf-item-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px}.pdf-item-num{color:#94a3b8;min-width:22px;font-size:12px;font-weight:bold;flex-shrink:0;padding-top:2px}.pdf-item-body{flex:1}.pdf-item-title{font-size:14px;font-weight:bold;color:#111;margin-bottom:3px}.pdf-item-desc{font-size:12px;color:#444;margin-bottom:6px;line-height:1.5}.pdf-tag{display:inline-block;font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;padding:3px 10px;border-radius:20px;flex-shrink:0}.pdf-tag-open{background:#dbeafe;color:#1d4ed8}.pdf-tag-resolved{background:#dcfce7;color:#15803d}.pdf-tag-blocked{background:#fee2e2;color:#dc2626}.pdf-item-meta{font-size:11px;color:#888;display:flex;gap:12px;flex-wrap:wrap;margin-top:4px}.pdf-overdue{color:#dc2626;font-weight:600}.pdf-carried{font-size:10px;color:#d97706;margin-top:3px}.pdf-notes-block{font-size:13px;color:#333;white-space:pre-wrap;line-height:1.7;background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px}.pdf-footer{background:${bgDarker};padding:14px 40px;font-size:10px;color:#94a3b8;text-align:center}`;
+      const bgDarker   = this._darken(bg,     0.06);
+      return `*{box-sizing:border-box;margin:0;padding:0}` +
+        `body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,Arial,sans-serif;font-size:13px;line-height:1.6;color:#222;background:${bg}}` +
+        `.pdf-wrap{width:794px;background:${bg}}` +
+        `.pdf-header{background:linear-gradient(135deg,${accentDark} 0%,${accent} 100%);padding:32px 40px 24px;margin-bottom:0}` +
+        `.pdf-header-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}` +
+        `.pdf-logo img{max-height:52px;max-width:140px;object-fit:contain;filter:brightness(0) invert(1)}` +
+        `.pdf-org{font-size:10px;text-transform:uppercase;letter-spacing:.15em;color:rgba(255,255,255,0.75);margin-bottom:6px}` +
+        `.pdf-title{font-size:24px;font-weight:bold;color:#fff;margin-bottom:4px}` +
+        `.pdf-meta-bar{display:flex;gap:24px;flex-wrap:wrap}` +
+        `.pdf-meta{font-size:12px;color:rgba(255,255,255,0.80);margin-bottom:0}` +
+        `.pdf-body{padding:32px 40px 8px}` +
+        `.pdf-section{margin-bottom:28px}` +
+        `.pdf-section-title{font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.12em;color:${accent};margin-bottom:14px;padding-left:10px;border-left:3px solid ${accent};border-radius:2px}` +
+        `.pdf-item{background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:10px;page-break-inside:avoid;break-inside:avoid}` +
+        `.pdf-item-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px}` +
+        `.pdf-item-num{color:#94a3b8;min-width:22px;font-size:12px;font-weight:bold;flex-shrink:0;padding-top:2px}` +
+        `.pdf-item-body{flex:1}` +
+        `.pdf-item-title{font-size:14px;font-weight:bold;color:#111;margin-bottom:3px}` +
+        `.pdf-item-desc{font-size:12px;color:#444;margin-bottom:6px;line-height:1.5;white-space:pre-wrap}` +
+        `.pdf-tag-row{display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0}` +
+        `.pdf-tag{display:inline-block;font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;padding:3px 10px;border-radius:20px}` +
+        `.pdf-tag-open{background:#dbeafe;color:#1d4ed8}` +
+        `.pdf-tag-resolved{background:#dcfce7;color:#15803d}` +
+        `.pdf-tag-blocked{background:#fee2e2;color:#dc2626}` +
+        `.pdf-tag-priority-low{background:#f3f4f6;color:#6b7280}` +
+        `.pdf-tag-priority-high{background:#fef3c7;color:#d97706}` +
+        `.pdf-tag-priority-critical{background:#fee2e2;color:#dc2626;font-weight:800}` +
+        `.pdf-item-meta{font-size:11px;color:#888;display:flex;gap:12px;flex-wrap:wrap;margin-top:4px}` +
+        `.pdf-overdue{color:#dc2626;font-weight:600}` +
+        `.pdf-carried{font-size:10px;color:#d97706;margin-top:3px}` +
+        `.pdf-notes-block{font-size:13px;color:#333;white-space:pre-wrap;line-height:1.7;background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px}` +
+        `.pdf-footer{background:${bgDarker};padding:14px 40px;font-size:10px;color:#94a3b8;text-align:center}`;
     },
 
     generateHTML(meeting, masterAttendees, settings) {
@@ -1102,7 +1235,6 @@
       const dateMode = (settings && settings.dateMode) || 'exact';
       const logoUrl  = settings && settings.logoDataUrl;
 
-      // Resolve attendees (new IDs or legacy strings)
       let attendeeList = [];
       if (meeting.attendeeIds && meeting.attendeeIds.length > 0) {
         attendeeList = meeting.attendeeIds
@@ -1110,7 +1242,6 @@
           .filter(Boolean)
           .map(a => Utils.formatAttendee(a));
       } else if (meeting.attendees && meeting.attendees.length > 0) {
-        // Backward compat: old string array
         attendeeList = meeting.attendees;
       }
 
@@ -1138,22 +1269,27 @@
         </div>`;
       }
 
-      // Agenda Points (new structure)
       const agendaPoints = meeting.agendaPoints || [];
       if (agendaPoints.length > 0) {
         h += `<div class="pdf-section"><div class="pdf-section-title">Agenda Points</div>`;
         agendaPoints.forEach((ap, i) => {
-          const tagClass = ap.status === 'resolved' ? 'pdf-tag-resolved'
-                         : ap.status === 'blocked'  ? 'pdf-tag-blocked' : 'pdf-tag-open';
-          const title = ap.title || ap.text || 'Untitled';
-          const desc  = ap.description || ap.notes || '';
+          const statusClass = ap.status === 'resolved' ? 'pdf-tag-resolved'
+                            : ap.status === 'blocked'  ? 'pdf-tag-blocked' : 'pdf-tag-open';
+          const priority    = ap.priority || 'medium';
+          const priorityTag = priority !== 'medium'
+            ? `<span class="pdf-tag pdf-tag-priority-${priority}">${priority.toUpperCase()}</span>` : '';
+
+          const title    = ap.title || ap.text || 'Untitled';
+          const desc     = ap.description || ap.notes || '';
           const assignee = Utils.getAttendeeById(ap.assigneeId, masterAttendees);
           const deadlineInfo = ap.deadline ? Utils.getDeadlineInfo(ap.deadline, dateMode) : null;
 
           let metaParts = [];
           if (assignee) metaParts.push(`&#x1F464; ${esc(Utils.formatAttendee(assignee))}`);
           if (deadlineInfo) {
-            const overdueStr = deadlineInfo.isOverdue ? ` <strong class="pdf-overdue">(${esc(deadlineInfo.countdown)})</strong>` : ` &bull; ${esc(deadlineInfo.countdown)}`;
+            const overdueStr = deadlineInfo.isOverdue
+              ? ` <strong class="pdf-overdue">(${esc(deadlineInfo.countdown)})</strong>`
+              : ` &bull; ${esc(deadlineInfo.countdown)}`;
             metaParts.push(`&#x1F4C5; ${esc(deadlineInfo.label)}${overdueStr}`);
           }
 
@@ -1168,7 +1304,10 @@
                   ${ap.carriedOverFrom ? `<div class="pdf-carried">&#x21A9; Carried over from previous meeting</div>` : ''}
                 </div>
               </div>
-              <span class="pdf-tag ${tagClass}">${esc(ap.status)}</span>
+              <div class="pdf-tag-row">
+                ${priorityTag}
+                <span class="pdf-tag ${statusClass}">${esc(ap.status)}</span>
+              </div>
             </div>
           </div>`;
         });
@@ -1295,6 +1434,7 @@
         const dateMode   = State.settings.dateMode;
         const deadlineInfo = ap.deadline ? Utils.getDeadlineInfo(ap.deadline, dateMode) : null;
         const assignee   = Utils.getAttendeeById(ap.assigneeId, State.masterAttendees);
+        const priority   = ap.priority || 'medium';
 
         const div = document.createElement('div');
         div.className = 'agenda-point-item'
@@ -1316,8 +1456,11 @@
           `<option value="${s}" ${ap.status === s ? 'selected' : ''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`
         ).join('');
 
+        const priorityBadgeHtml = `<span class="badge badge-priority-${priority}">${priority.charAt(0).toUpperCase()+priority.slice(1)}</span>`;
+
         div.innerHTML = `
           <div class="agenda-point-header">
+            <span class="drag-handle" draggable="true" title="Drag to reorder">&#x2807;</span>
             <div class="${titleClass}">${Utils.escapeHtml(ap.title || ap.text || 'Untitled')}</div>
             <div class="agenda-point-actions">
               <button class="item-action-btn" title="Edit">&#x270E;</button>
@@ -1327,16 +1470,56 @@
           ${ap.description ? `<div class="agenda-point-description">${Utils.escapeHtml(ap.description)}</div>` : ''}
           <div class="agenda-point-meta">
             <select class="status-select-inline ${ap.status}" title="Change status">${statusOptions}</select>
+            ${priorityBadgeHtml}
             ${assignee ? `<span class="agenda-meta-pill">&#x1F464; ${Utils.escapeHtml(Utils.formatAttendee(assignee))}</span>` : ''}
             ${deadlineBadgeHtml}
             ${isCarried ? `<span class="badge badge-carried">&#x21A9; carried over</span>` : ''}
           </div>`;
+
+        // Drag-and-drop
+        const handleEl = div.querySelector('.drag-handle');
+        handleEl.addEventListener('dragstart', e => {
+          e.dataTransfer.setData('text/plain', ap.id);
+          e.dataTransfer.effectAllowed = 'move';
+          try { e.dataTransfer.setDragImage(div, 12, 12); } catch(_) {}
+          setTimeout(() => div.classList.add('dragging'), 0);
+        });
+        handleEl.addEventListener('dragend', () => {
+          div.classList.remove('dragging');
+          list.querySelectorAll('.agenda-point-item').forEach(el => el.classList.remove('drag-over'));
+        });
+        div.addEventListener('dragover', e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          list.querySelectorAll('.agenda-point-item').forEach(el => el.classList.remove('drag-over'));
+          div.classList.add('drag-over');
+        });
+        div.addEventListener('dragleave', e => {
+          if (!div.contains(e.relatedTarget)) div.classList.remove('drag-over');
+        });
+        div.addEventListener('drop', e => {
+          e.preventDefault();
+          div.classList.remove('drag-over');
+          const draggedId = e.dataTransfer.getData('text/plain');
+          if (!draggedId || draggedId === ap.id) return;
+          const pts     = State.current.agendaPoints;
+          const fromIdx = pts.findIndex(p => p.id === draggedId);
+          const toIdx   = pts.findIndex(p => p.id === ap.id);
+          if (fromIdx === -1 || toIdx === -1) return;
+          const [moved] = pts.splice(fromIdx, 1);
+          pts.splice(toIdx, 0, moved);
+          State.isDirty = true;
+          UI.renderAgendaList();
+          UI.updateCounts();
+          App.saveDraft(true);
+        });
 
         div.querySelector('.item-action-btn').addEventListener('click', () => App.openEditAgenda(ap.id));
         div.querySelector('.item-action-btn.delete').addEventListener('click', () => App.removeAgenda(ap.id));
         div.querySelector('.status-select-inline').addEventListener('change', e => {
           App.updateAgendaStatus(ap.id, e.target.value, e.target, div);
         });
+
         list.appendChild(div);
       });
     },
@@ -1360,11 +1543,11 @@
         const prev    = meeting.previousMeetingId
           ? State.meetings.find(m => m.id === meeting.previousMeetingId) : null;
         const changes = State.computeChanges(prev, meeting);
-        const icons   = { added:'➕', resolved:'✅', blocked:'🚫', removed:'🗑️', reopened:'🔄' };
+        const icons   = { added:'\u2795', resolved:'\u2705', blocked:'\uD83D\uDEAB', removed:'\uD83D\uDDD1\uFE0F', reopened:'\uD83D\uDD04' };
 
         let changesHtml = '';
         changes.slice(0, 6).forEach(ch => {
-          const icon = icons[ch.type] || '•';
+          const icon = icons[ch.type] || '\u2022';
           changesHtml += `<div class="change-item">
             <span>${icon}</span>
             <span><strong>${Utils.escapeHtml(ch.type)}</strong>: ${Utils.escapeHtml(ch.text)}</span>
@@ -1372,8 +1555,7 @@
         });
         if (changes.length > 6) changesHtml += `<div class="change-item" style="color:var(--gray-400)">&#x2026;and ${changes.length - 6} more</div>`;
 
-        // Resolve attendees for display
-        const attendeeIds = meeting.attendeeIds || [];
+        const attendeeIds   = meeting.attendeeIds || [];
         const attendeeNames = attendeeIds.length > 0
           ? attendeeIds.map(id => {
               const a = Utils.getAttendeeById(id, State.masterAttendees);
@@ -1381,8 +1563,7 @@
             }).filter(Boolean)
           : (meeting.attendees || []);
         const attendeeCount = attendeeNames.length;
-
-        const openCount = (meeting.agendaPoints || []).filter(p => p.status !== 'resolved').length;
+        const openCount     = (meeting.agendaPoints || []).filter(p => p.status !== 'resolved').length;
 
         const entry = document.createElement('div');
         entry.className = 'history-entry';
@@ -1413,14 +1594,13 @@
     },
 
     renderSettings() {
-      // Logo
       const logoUrl = State.settings.logoDataUrl;
-      const settingsImg  = document.getElementById('settings-logo-img');
-      const placeholder  = document.getElementById('settings-logo-placeholder');
-      const removeBtn    = document.getElementById('remove-logo-btn');
+      const settingsImg = document.getElementById('settings-logo-img');
+      const placeholder = document.getElementById('settings-logo-placeholder');
+      const removeBtn   = document.getElementById('remove-logo-btn');
       if (settingsImg) {
         if (logoUrl) {
-          settingsImg.src     = logoUrl;
+          settingsImg.src           = logoUrl;
           settingsImg.style.display = 'block';
           if (placeholder) placeholder.style.display = 'none';
           if (removeBtn)   removeBtn.style.display   = 'inline-flex';
@@ -1431,12 +1611,10 @@
         }
       }
 
-      // Date mode radio
-      const mode = State.settings.dateMode || 'exact';
+      const mode  = State.settings.dateMode || 'exact';
       const radio = document.querySelector(`input[name="dateMode"][value="${mode}"]`);
       if (radio) radio.checked = true;
 
-      // PDF accent color swatches + custom picker
       const accentColor = State.settings.pdfAccentColor || '#4b5563';
       document.querySelectorAll('#pdf-accent-swatches .color-swatch').forEach(s => {
         s.classList.toggle('active', s.dataset.color === accentColor);
@@ -1444,7 +1622,6 @@
       const accentCustom = document.getElementById('pdf-accent-custom');
       if (accentCustom) accentCustom.value = accentColor;
 
-      // PDF background color swatches + custom picker
       const bgColor = State.settings.pdfBgColor || '#f3f4f6';
       document.querySelectorAll('#pdf-bg-swatches .color-swatch').forEach(s => {
         s.classList.toggle('active', s.dataset.color === bgColor);
@@ -1452,14 +1629,13 @@
       const bgCustom = document.getElementById('pdf-bg-custom');
       if (bgCustom) bgCustom.value = bgColor;
 
-      // Attendees master list table
       this.renderAttendeeMasterList();
     },
 
     renderAttendeeMasterList() {
-      const tbody     = document.getElementById('attendees-master-tbody');
-      const table     = document.getElementById('attendees-master-table');
-      const emptyMsg  = document.getElementById('attendees-master-empty');
+      const tbody    = document.getElementById('attendees-master-tbody');
+      const table    = document.getElementById('attendees-master-table');
+      const emptyMsg = document.getElementById('attendees-master-empty');
       if (!tbody) return;
       tbody.innerHTML = '';
 
@@ -1476,7 +1652,7 @@
         tr.innerHTML = `
           <td>${Utils.escapeHtml(a.name)}</td>
           <td>${Utils.escapeHtml(a.surname)}</td>
-          <td>${Utils.escapeHtml(a.company || '—')}</td>
+          <td>${Utils.escapeHtml(a.company || '\u2014')}</td>
           <td>
             <div class="actions-cell">
               <button class="btn btn-sm btn-outline" data-id="${Utils.escapeHtml(a.id)}">&#x270E;</button>
@@ -1490,13 +1666,13 @@
     },
 
     applyLogo() {
-      const logoUrl  = State.settings.logoDataUrl;
-      const imgEl    = document.getElementById('header-logo-img');
-      const iconEl   = document.getElementById('header-logo-icon');
+      const logoUrl = State.settings.logoDataUrl;
+      const imgEl   = document.getElementById('header-logo-img');
+      const iconEl  = document.getElementById('header-logo-icon');
       if (imgEl && iconEl) {
         if (logoUrl) {
-          imgEl.src           = logoUrl;
-          imgEl.style.display = 'block';
+          imgEl.src            = logoUrl;
+          imgEl.style.display  = 'block';
           iconEl.style.display = 'none';
         } else {
           imgEl.style.display  = 'none';
@@ -1557,107 +1733,24 @@
   };
 
   /* ======================================================================
-     STORAGE SETUP — handles the folder-picker flow on first/each load
-     ====================================================================== */
-  const StorageSetup = {
-    /* Show step 1 (folder picker) */
-    show() {
-      document.getElementById('setup-step-1').style.display = '';
-      document.getElementById('setup-step-2').style.display = 'none';
-      document.getElementById('folder-setup-overlay').classList.add('visible');
-    },
-
-    hide() {
-      document.getElementById('folder-setup-overlay').classList.remove('visible');
-    },
-
-    /* Called by "Open folder" button */
-    async pickFolder() {
-      try {
-        await Storage.connectFolder();
-        await this._showFileStep();
-      } catch (e) {
-        if (e.name === 'AbortError') return;
-        UI.showToast('Could not open folder: ' + e.message, 'error');
-      }
-    },
-
-    /* Populate and show step 2 */
-    async _showFileStep() {
-      const files = await Storage.listJsonFiles();
-
-      document.getElementById('setup-folder-crumb').textContent = Storage._dirHandle.name;
-
-      const list = document.getElementById('setup-file-list');
-      list.innerHTML = '';
-
-      if (files.length === 0) {
-        list.innerHTML = '<div class="setup-no-files">No .json files found — create one below.</div>';
-      } else {
-        files.forEach(name => {
-          const btn = document.createElement('button');
-          btn.className = 'setup-file-btn';
-          btn.innerHTML = '&#x1F4C4; ' + Utils.escapeHtml(name);
-          btn.onclick = () => this.openFile(name);
-          list.appendChild(btn);
-        });
-      }
-
-      document.getElementById('setup-new-filename').value = '';
-      document.getElementById('setup-step-1').style.display = 'none';
-      document.getElementById('setup-step-2').style.display = '';
-    },
-
-    /* "← Back" button */
-    backToFolder() {
-      document.getElementById('setup-step-1').style.display = '';
-      document.getElementById('setup-step-2').style.display = 'none';
-    },
-
-    /* Open an existing file from the list */
-    async openFile(name) {
-      try {
-        await Storage.openFile(name);
-        this.hide();
-        await App._afterStorageReady();
-      } catch (e) {
-        UI.showToast('Could not open ' + name + ': ' + e.message, 'error');
-      }
-    },
-
-    /* "+ New" button */
-    async createNew() {
-      const input = document.getElementById('setup-new-filename');
-      const raw   = (input.value || '').trim();
-      if (!raw) { input.focus(); return; }
-      // Strip illegal filesystem characters; strip any trailing .json the user typed
-      const safe = raw.replace(/[/\\:*?"<>|]/g, '-').replace(/\.json$/i, '');
-      await this.openFile(safe + '.json');
-    }
-  };
-
-  /* ======================================================================
      APP — Controller / event orchestration
      ====================================================================== */
   const App = {
     saveTimeout: null,
 
     init() {
-      Storage.init();        // synchronous: cleans up legacy IDB, no auto-connect
-      StorageSetup.show();   // always prompt for the current folder
+      Storage.init();
+      this._afterStorageReady().catch(err => {
+        console.error('App init failed:', err);
+        UI.showToast('Failed to initialize: ' + err.message, 'error');
+      });
     },
 
     async _afterStorageReady() {
-      // Show active filename in header and browser tab
-      const fileEl = document.getElementById('header-file');
-      if (fileEl) { fileEl.textContent = Storage.activeFile; fileEl.style.display = ''; }
-      document.title = Storage.activeFile + ' — Meeting Minutes';
-
       State.settings        = await Storage.loadSettings();
       State.masterAttendees = await Storage.loadAttendees();
       State.meetings        = await Storage.getAllMeetings();
 
-      // Default opening: draft if exists, else pre-fill from latest meeting
       const draft = await Storage.loadDraft();
       if (draft) {
         State.current = draft;
@@ -1671,7 +1764,7 @@
       UI.renderHistory();
       UI.renderSettings();
 
-      // Form input auto-save listeners
+      // Form auto-save listeners
       ['meeting-title', 'meeting-date', 'meeting-notes'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('input', () => App.markUnsaved());
@@ -1742,11 +1835,11 @@
       }
     },
 
-    // ---- Attendee Toggle (checklist) ----
+    // ---- Attendee Toggle ----
     toggleAttendee(attendeeId, checked, labelEl) {
       State.syncFromForm();
       const idx = State.current.attendeeIds.indexOf(attendeeId);
-      if (checked && idx === -1)  State.current.attendeeIds.push(attendeeId);
+      if (checked  && idx === -1) State.current.attendeeIds.push(attendeeId);
       if (!checked && idx !== -1) State.current.attendeeIds.splice(idx, 1);
       State.isDirty = true;
       if (labelEl) labelEl.classList.toggle('selected', checked);
@@ -1762,6 +1855,7 @@
       document.getElementById('agenda-description-input').value = '';
       document.getElementById('agenda-deadline-input').value    = '';
       document.getElementById('agenda-status-input').value      = 'open';
+      document.getElementById('agenda-priority-input').value    = 'medium';
       UI.populateAssigneeDropdown(document.getElementById('agenda-assignee-input'), '');
       document.getElementById('agenda-modal').classList.add('visible');
       setTimeout(() => document.getElementById('agenda-title-input').focus(), 50);
@@ -1778,25 +1872,27 @@
       document.getElementById('agenda-description-input').value = ap.description || ap.notes || '';
       document.getElementById('agenda-deadline-input').value    = ap.deadline || ap.dueDate || '';
       document.getElementById('agenda-status-input').value      = ap.status || 'open';
+      document.getElementById('agenda-priority-input').value    = ap.priority || 'medium';
       UI.populateAssigneeDropdown(document.getElementById('agenda-assignee-input'), ap.assigneeId || '');
       document.getElementById('agenda-modal').classList.add('visible');
       setTimeout(() => document.getElementById('agenda-title-input').focus(), 50);
     },
 
     saveAgendaPoint() {
-      const title       = (document.getElementById('agenda-title-input').value || '').trim();
-      const description = (document.getElementById('agenda-description-input').value || '').trim();
-      const assigneeId  = document.getElementById('agenda-assignee-input').value || '';
-      const deadline    = document.getElementById('agenda-deadline-input').value || '';
-      const status      = document.getElementById('agenda-status-input').value || 'open';
+      const title       = (document.getElementById('agenda-title-input').value       || '').trim();
+      const description =  document.getElementById('agenda-description-input').value || '';
+      const assigneeId  =  document.getElementById('agenda-assignee-input').value    || '';
+      const deadline    =  document.getElementById('agenda-deadline-input').value    || '';
+      const status      =  document.getElementById('agenda-status-input').value      || 'open';
+      const priority    =  document.getElementById('agenda-priority-input').value    || 'medium';
 
       if (!title) { UI.showToast('Title is required', 'warning'); return; }
 
       if (State.editingAgendaId) {
-        State.updateAgendaPoint(State.editingAgendaId, { title, description, assigneeId, deadline, status });
+        State.updateAgendaPoint(State.editingAgendaId, { title, description, assigneeId, deadline, status, priority });
         UI.showToast('Agenda point updated', 'success');
       } else {
-        State.addAgendaPoint(title, description, assigneeId, deadline, status);
+        State.addAgendaPoint(title, description, assigneeId, deadline, status, priority);
         UI.showToast('Agenda point added', 'success');
       }
       App.closeModal('agenda-modal');
@@ -1807,10 +1903,7 @@
 
     updateAgendaStatus(id, newStatus, selectEl, itemEl) {
       State.updateAgendaPoint(id, { status: newStatus });
-      // Update CSS classes without full re-render for better UX
-      if (selectEl) {
-        selectEl.className = `status-select-inline ${newStatus}`;
-      }
+      if (selectEl) selectEl.className = `status-select-inline ${newStatus}`;
       if (itemEl) {
         itemEl.classList.toggle('status-resolved', newStatus === 'resolved');
         itemEl.classList.toggle('status-blocked',  newStatus === 'blocked');
@@ -1872,7 +1965,7 @@
     async saveDateMode(mode) {
       State.settings.dateMode = mode;
       await Storage.saveSettings(State.settings);
-      UI.renderAgendaList(); // re-render to update deadline display
+      UI.renderAgendaList();
       UI.renderHistory();
       UI.showToast(`Date mode: ${mode === 'cw' ? 'Calendar Weeks' : 'Exact Dates'}`, 'success');
     },
@@ -1915,14 +2008,13 @@
       await Storage.saveAttendees(State.masterAttendees);
       App.closeModal('attendee-modal');
       UI.renderAttendeeMasterList();
-      UI.renderAttendeeChecklist(); // refresh checklist in editor
+      UI.renderAttendeeChecklist();
       UI.showToast(State.editingAttendeeId ? 'Attendee updated' : 'Attendee added', 'success');
     },
 
     async deleteAttendee(id) {
       if (!confirm('Remove this person from the master list?')) return;
       State.masterAttendees = State.masterAttendees.filter(a => a.id !== id);
-      // Also remove from current draft's attendeeIds
       if (State.current) {
         State.current.attendeeIds = State.current.attendeeIds.filter(x => x !== id);
         App.saveDraft(true);
@@ -1977,8 +2069,7 @@
       const open = (m.agendaPoints || []).filter(p => p.status !== 'resolved').length;
       const summary = document.getElementById('finalize-summary');
       if (summary) {
-        const attendeeIds = m.attendeeIds || [];
-        const attendeeCount = attendeeIds.length;
+        const attendeeCount = (m.attendeeIds || []).length;
         summary.innerHTML = `
           <p><strong>${Utils.escapeHtml(m.title)}</strong></p>
           <p>&#x1F4C5; ${Utils.formatDate(m.date)}</p>
@@ -1997,12 +2088,11 @@
       try {
         State.syncFromForm();
         State.current.finalizedAt = Date.now();
-        await Storage.saveMeeting(State.current);  // save to history
-        await Storage.clearDraft();                 // remove draft
+        await Storage.saveMeeting(State.current);
+        await Storage.clearDraft();
         State.meetings = await Storage.getAllMeetings();
         UI.renderHistory();
         UI.showToast('Meeting finalized and saved to history!', 'success', 4000);
-        // Start new draft from just-finalized meeting
         const finalized = State.current;
         State.current = State.createNewMeeting(finalized);
         State.isDirty = true;
@@ -2016,10 +2106,37 @@
       }
     },
 
+    // ---- Clear All ----
+    openClearAll() {
+      const input = document.getElementById('clear-confirm-input');
+      if (input) input.value = '';
+      document.getElementById('clear-all-modal').classList.add('visible');
+      setTimeout(() => { if (input) input.focus(); }, 50);
+    },
+
+    confirmClearAll() {
+      const val = (document.getElementById('clear-confirm-input').value || '').trim().toLowerCase();
+      if (val !== 'clear') {
+        UI.showToast('Type the word "clear" to confirm', 'warning');
+        return;
+      }
+      Storage.clearAll();
+      State.current         = State.createNewMeeting();
+      State.meetings        = [];
+      State.masterAttendees = [];
+      State.settings        = { dateMode:'exact', logoDataUrl:null, pdfAccentColor:'#4b5563', pdfBgColor:'#f3f4f6' };
+      State.isDirty         = false;
+      App.closeModal('clear-all-modal');
+      UI.render();
+      UI.renderHistory();
+      UI.renderSettings();
+      UI.showToast('All data cleared', 'success');
+    },
+
     // ---- PDF Preview / Export ----
     previewPDF() {
       State.syncFromForm();
-      State.previewMeetingId = null; // current draft
+      State.previewMeetingId = null;
       const content = document.getElementById('pdf-content');
       const preview = document.getElementById('pdf-preview');
       const label   = document.getElementById('pdf-preview-label');
@@ -2125,39 +2242,18 @@
   });
 
   document.addEventListener('DOMContentLoaded', () => {
-    if (!window._STORAGE_OK) {
+    // Verify localStorage is available
+    try {
+      localStorage.setItem('__mm_test', '1');
+      localStorage.removeItem('__mm_test');
+    } catch (e) {
       document.body.innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f9fafb;padding:24px;font-family:system-ui,sans-serif;text-align:center;">
           <div style="max-width:480px;">
             <div style="font-size:48px;margin-bottom:24px;">&#x26A0;&#xFE0F;</div>
-            <h1 style="font-size:22px;font-weight:700;color:#111827;margin-bottom:12px;">Storage module missing</h1>
-            <p style="font-size:15px;color:#6b7280;line-height:1.6;margin-bottom:24px;">
-              Please ensure <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-family:monospace;">storage.js</code>
-              is in the same folder as
-              <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-family:monospace;">index.html</code>.
-            </p>
-            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;font-size:13px;color:#9ca3af;font-family:monospace;text-align:left;line-height:1.8;">
-              &#x1F4C1; your-folder/<br>
-              &nbsp;&nbsp;&#x251C;&#x2500;&#x2500; index.html<br>
-              &nbsp;&nbsp;&#x251C;&#x2500;&#x2500; storage.js &nbsp;<span style="color:#dc2626;">&#x2190; missing</span><br>
-              &nbsp;&nbsp;&#x2514;&#x2500;&#x2500; your-database.json
-            </div>
-          </div>
-        </div>`;
-      return;
-    }
-    if (!window._FSA_OK) {
-      document.body.innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f9fafb;padding:24px;font-family:system-ui,sans-serif;text-align:center;">
-          <div style="max-width:520px;">
-            <div style="font-size:48px;margin-bottom:24px;">&#x1F6AB;</div>
-            <h1 style="font-size:22px;font-weight:700;color:#111827;margin-bottom:12px;">Browser not supported</h1>
-            <p style="font-size:15px;color:#6b7280;line-height:1.6;margin-bottom:16px;">
-              This app uses the <strong>File System Access API</strong> to store data directly
-              in your project folder, making it fully portable.
-            </p>
+            <h1 style="font-size:22px;font-weight:700;color:#111827;margin-bottom:12px;">Storage unavailable</h1>
             <p style="font-size:15px;color:#6b7280;line-height:1.6;">
-              Please open this file in <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> (version 86 or later).
+              localStorage is not accessible. Please enable cookies / site data in your browser settings and reload.
             </p>
           </div>
         </div>`;

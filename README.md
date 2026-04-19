@@ -19,7 +19,6 @@
 * Finalize meetings to history and carry open items forward to the next session
 * Export to PDF with customizable accent and background colors
 * Manage a master attendee list reusable across meetings
-* Support for multiple independent databases in the same folder (e.g. supplier1.json, internal.json)
 
 ---
 
@@ -32,7 +31,7 @@
 
 ### 📖 How to Use
 
-Open index.html in Chrome or Edge, select your working folder, then choose or create a .json database file. From that point, all reads and writes go to that file only. No browser cache, no hidden state, no cross-session references.
+Open index.html in Chrome or Edge. No browser cache, no hidden state, no cross-session references.
 
 ---
 
@@ -45,6 +44,4 @@ Open index.html in Chrome or Edge, select your working folder, then choose or cr
 /project-folder
 │
 ├── index.html
-├── storage.js
-└── your-database.json
 ```
